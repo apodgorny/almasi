@@ -1,15 +1,15 @@
-# WhiteLabel invariants 4
+# Almasi invariants 4
 
 ## Python carrier law
 
 - Any `.py` file that is loaded through `py.py` is an own-module source file by law.
 - Such a file must define exactly one loadable class with the required `snake_to_camel` relationship between filename and class name.
-- That class must extend `wl.Module`.
-- If a `.py` file does not satisfy that contract, it is not a valid WL carrier and must not load through `WL` or `O`.
+- That class must extend `a.Module`.
+- If a `.py` file does not satisfy that contract, it is not a valid A carrier and must not load through `A` or `O`.
 
 ## Scope
 
-This file is a supplement to `whitelabel_invariants1.md`, `whitelabel_invariants2.md`, and `whitelabel_invariants3.md`.
+This file is a supplement to `almasi_invariants1.md`, `almasi_invariants2.md`, and `almasi_invariants3.md`.
 It captures later refinements established in the current design line.
 If an item here conflicts with an earlier note, this supplement is newer for that specific point.
 
@@ -17,10 +17,10 @@ If an item here conflicts with an earlier note, this supplement is newer for tha
 
 ## Canonical published-face law
 
-- A library class such as `WL`, `O`, or `LLM` may expose a lowercase published face in module scope.
+- A library class such as `A`, `O`, or `LLM` may expose a lowercase published face in module scope.
 - The lowercase symbol is a derived projection of the class name.
 - Example:
-  - `WL` -> `wl`
+  - `A` -> `a`
   - `O` -> `o`
   - `LLM` -> `llm`
 - The lowercase symbol must not be treated as an independent source of truth.
@@ -39,7 +39,7 @@ Equivalent wording:
 - Manual patterns such as:
 
 ```python
-wl = WL()
+a = A()
 ```
 
 introduce a second manually-maintained naming source.
@@ -52,7 +52,7 @@ introduce a second manually-maintained naming source.
 
 - If lowercase published faces are used, publication belongs in metaclass class-creation flow.
 - Publication is part of library birth, not part of ordinary runtime calls.
-- Therefore publishing from `WLMeta.__new__` is preferred over publishing from `WL()` calls.
+- Therefore publishing from `AMeta.__new__` is preferred over publishing from `A()` calls.
 
 Equivalent wording:
 
@@ -63,7 +63,7 @@ Equivalent wording:
 
 ## No scope-mutation call law
 
-- Ordinary calls such as `WL()` should not silently mutate caller scope by creating names.
+- Ordinary calls such as `A()` should not silently mutate caller scope by creating names.
 - Injecting names into arbitrary caller scope during calls is too implicit.
 - If publication exists, it should target the declaring module scope during class creation.
 
@@ -152,7 +152,7 @@ Two entities may share the same textual name, such as `o`:
 These must not be confused.
 
 - Python import machinery may refer to the module object.
-- WhiteLabel runtime usage may refer to the published library head.
+- Almasi runtime usage may refer to the published library head.
 - Loaders and injected namespaces must be explicit about which entity a symbol references.
 
 ---
@@ -167,7 +167,7 @@ These must not be confused.
 
 ## Installation law
 
-- The WhiteLabel library is installed through `pip` using the project bootstrap script `install.sh`.
+- The Almasi library is installed through `pip` using the project bootstrap script `install.sh`.
 - The script is the canonical convenience entrypoint for local installation and reinstallation during development.
 - Typical form:
 

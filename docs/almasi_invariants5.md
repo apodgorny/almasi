@@ -1,15 +1,15 @@
-# WhiteLabel invariants 5
+# Almasi invariants 5
 
 ## Python carrier law
 
 - Any `.py` file that is loaded through `py.py` is an own-module source file by law.
 - Such a file must define exactly one loadable class with the required `snake_to_camel` relationship between filename and class name.
-- That class must extend `wl.Module`.
-- If a `.py` file does not satisfy that contract, it is not a valid WL carrier and must not load through `WL` or `O`.
+- That class must extend `a.Module`.
+- If a `.py` file does not satisfy that contract, it is not a valid A carrier and must not load through `A` or `O`.
 
 ## Scope
 
-This file supplements and corrects `whitelabel_invariants1.md` through `whitelabel_invariants4.md`.
+This file supplements and corrects `almasi_invariants1.md` through `almasi_invariants4.md`.
 Where specific points differ, this file is newer for those points.
 
 ---
@@ -18,7 +18,7 @@ Where specific points differ, this file is newer for those points.
 
 - A library class publishes a lowercase library face derived from the class name.
 - The lowercase face is a projection, not a second naming source of truth.
-- Manual alias lines such as `wl = WL()` remain non-canonical.
+- Manual alias lines such as `a = A()` remain non-canonical.
 - The class name is still the sole naming source of truth.
 
 ---
@@ -51,14 +51,14 @@ o.initialize()
 - This allows source files and plugins to write forms such as:
 
 ```python
-import wl
+import a
 import o
 ```
 
 and inherit from:
 
 ```python
-class Py(wl.Plugin):
+class Py(a.Plugin):
 	...
 ```
 
@@ -138,7 +138,7 @@ plugin(name, parent_path, parent_route)
 
 ## Dual access law
 
-WhiteLabel supports two distinct access gestures:
+Almasi supports two distinct access gestures:
 
 ### Iteration gesture
 
@@ -182,7 +182,7 @@ This keeps namespace law separate from storage law.
 ## Directory iteration law
 
 - `Directory.__iter__()` is a discovery gesture.
-- It should enumerate immediate WL children in carrier form.
+- It should enumerate immediate A children in carrier form.
 - Iteration should not collapse immediately into fully loaded domain objects.
 - Iteration surface should therefore expose `File` / `Directory` children suitable for selective `load()` by the consumer.
 
@@ -192,7 +192,7 @@ This keeps namespace law separate from storage law.
 
 - Discovery enumerates possible children.
 - Realization materializes a chosen child into its executable or usable form.
-- WhiteLabel should preserve this distinction across APIs.
+- Almasi should preserve this distinction across APIs.
 
 ---
 

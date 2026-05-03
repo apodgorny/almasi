@@ -1,15 +1,15 @@
-# WhiteLabel invariants 2
+# Almasi invariants 2
 
 ## Python carrier law
 
 - Any `.py` file that is loaded through `py.py` is an own-module source file by law.
 - Such a file must define exactly one loadable class with the required `snake_to_camel` relationship between filename and class name.
-- That class must extend `wl.Module`.
-- If a `.py` file does not satisfy that contract, it is not a valid WL carrier and must not load through `WL` or `O`.
+- That class must extend `a.Module`.
+- If a `.py` file does not satisfy that contract, it is not a valid A carrier and must not load through `A` or `O`.
 
 ## Scope
 
-This file is a supplement to `whitelabel_invariants1.md`.
+This file is a supplement to `almasi_invariants1.md`.
 It captures only the additional or refined invariants established later in the same design line.
 If an item here conflicts with the earlier note, this supplement is newer for that specific point.
 
@@ -19,15 +19,15 @@ If an item here conflicts with the earlier note, this supplement is newer for th
 
 - The architecture was simplified by removing `File` as a first-class mandatory intermediary.
 - The minimal stable ontology is now:
-  - `WL` / library law
+  - `A` / library law
   - `Directory` / spatial continuation
   - plugins / interpretation of terminal non-directory forms
-- `Resolver` is not required as a separate permanent ontology object if its logic can live directly in `WL`.
-- The router may be implemented directly on `WL`, because path resolution is part of the library law itself.
+- `Resolver` is not required as a separate permanent ontology object if its logic can live directly in `A`.
+- The router may be implemented directly on `A`, because path resolution is part of the library law itself.
 
 Equivalent wording:
 
-- `WL` decides how names are resolved
+- `A` decides how names are resolved
 - `Directory` continues spatial lookup
 - plugins interpret terminal forms
 - `File` is optional and not load-bearing in the new minimal line
@@ -51,15 +51,15 @@ Summary formula:
 
 ## Explicit OS-space law
 
-- `WL` may have OS-reaching ability, but OS-space must not be an implicit fallback of ordinary lineage module lookup.
+- `A` may have OS-reaching ability, but OS-space must not be an implicit fallback of ordinary lineage module lookup.
 - Ordinary authored-root inheritance and OS-space are different modes and must not be collapsed.
 - Searching the full filesystem root such as `'/'` as a silent parent fallback is too broad and conceptually wrong.
-- If `WL` exposes OS-space, it should do so through an explicit branch or mount-like manifestation.
+- If `A` exposes OS-space, it should do so through an explicit branch or mount-like manifestation.
 
 Examples of acceptable expression:
 
-- an explicit namespace such as `wl.sys.Users.Alexander`
-- an explicit mount / alias such as `wl.link('sys', '/')`
+- an explicit namespace such as `a.sys.Users.Alexander`
+- an explicit mount / alias such as `a.link('sys', '/')`
 - a real filesystem symlink in the authored root such as `sys -> /`
 
 Equivalent wording:
@@ -71,7 +71,7 @@ Equivalent wording:
 
 ## Symlink manifestation law
 
-- Symlinks are a valid and preferred way to expose external namespaces inside WL space.
+- Symlinks are a valid and preferred way to expose external namespaces inside A space.
 - A mounted namespace such as `sys` can be represented as a real filesystem symlink rather than as hidden special logic.
 - This is conceptually cleaner because the filesystem itself expresses the connection.
 - A symlinked namespace is an explicit branch, not a fallback rule.
@@ -171,7 +171,7 @@ Equivalent wording:
 - Plugins are not persisted on disk in this line.
 - Therefore plugin mutation is process-local.
 - A child layer such as `O` may extend the available plugin pool during the current process.
-- Another independent program that loads `WL` afresh gets a fresh plugin pool.
+- Another independent program that loads `A` afresh gets a fresh plugin pool.
 - Because of this, a shared in-memory plugin dictionary across the current lineage is acceptable in this design line.
 
 Important nuance:
@@ -207,7 +207,7 @@ Equivalent wording:
 
 The current simplified line is:
 
-- `WL` holds intrinsic law and the main resolution router
+- `A` holds intrinsic law and the main resolution router
 - each layer has one canonical head
 - names resolve to a canonical stem path
 - directories continue as `Directory`

@@ -1,2 +1,2 @@
-import wl
-wl.tester.run()
+import a
+a.tester.run()

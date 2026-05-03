@@ -1,15 +1,15 @@
-# WhiteLabel invariants 3
+# Almasi invariants 3
 
 ## Python carrier law
 
 - Any `.py` file that is loaded through `py.py` is an own-module source file by law.
 - Such a file must define exactly one loadable class with the required `snake_to_camel` relationship between filename and class name.
-- That class must extend `wl.Module`.
-- If a `.py` file does not satisfy that contract, it is not a valid WL carrier and must not load through `WL` or `O`.
+- That class must extend `a.Module`.
+- If a `.py` file does not satisfy that contract, it is not a valid A carrier and must not load through `A` or `O`.
 
 ## Scope
 
-This file is a supplement to `whitelabel_invariants1.md` and `whitelabel_invariants2.md`.
+This file is a supplement to `almasi_invariants1.md` and `almasi_invariants2.md`.
 It captures only the later refinements established after those notes.
 If an item here conflicts with an earlier note, this supplement is newer for that specific point.
 
@@ -27,7 +27,7 @@ Two different locations must be kept distinct.
 
 ### 2. `__path__`
 
-- `__path__` is the library namespace root used for ordinary WL resolution.
+- `__path__` is the library namespace root used for ordinary A resolution.
 - It is where names such as `Foo` are resolved as directories or file stems.
 - If not supplied explicitly, it may default to `os.path.join(__lib_path__, 'root')`.
 
@@ -172,7 +172,7 @@ And preserves filesystem-backed inheritance.
 - A request such as `o.Foo` must search:
   - `o/root`
   - then `llm/root`
-  - then `whitelabel/root`
+  - then `almasi/root`
 - The first successful resolution wins.
 - This is the operational form of filesystem-backed namespace inheritance in the simplified line.
 
@@ -235,9 +235,9 @@ This is a practical stability law, not merely a style preference.
 
 The current simplified line may be summarized as:
 
-- `WLMeta` derives `__lib_path__` and `__path__`
-- `WLMeta` creates one canonical head per library class
-- `WLMeta` loads ordered plugins from `__lib_path__/plugins`
+- `AMeta` derives `__lib_path__` and `__path__`
+- `AMeta` creates one canonical head per library class
+- `AMeta` loads ordered plugins from `__lib_path__/plugins`
 - attribute access walks head lineage
 - intrinsic lookup happens first
 - resolution then walks each head's `__path__`

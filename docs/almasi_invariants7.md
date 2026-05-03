@@ -1,15 +1,15 @@
-# Whitelabel Invariants 7
+# Almasi Invariants 7
 
 ## Python carrier law
 
 - Any `.py` file that is loaded through `py.py` is an own-module source file by law.
 - Such a file must define exactly one loadable class with the required `snake_to_camel` relationship between filename and class name.
-- That class must extend `wl.Module`.
-- If a `.py` file does not satisfy that contract, it is not a valid WL carrier and must not load through `WL` or `O`.
+- That class must extend `a.Module`.
+- If a `.py` file does not satisfy that contract, it is not a valid A carrier and must not load through `A` or `O`.
 
 ## Scope
 
-This file records the next architectural decisions after `whitelabel_invariants6.md`.
+This file records the next architectural decisions after `almasi_invariants6.md`.
 It supplements previous invariants files.
 Where specific points differ, this file is newer for those points.
 
@@ -61,7 +61,7 @@ So the split is now:
 
 - Python source module identity is owned by `sys.modules[path]`.
 - A real resolved file path is the canonical execution-container key.
-- Separate WL-side module registries are redundant and non-canonical.
+- Separate A-side module registries are redundant and non-canonical.
 
 Meaning:
 
@@ -73,13 +73,13 @@ Meaning:
 ## Class authority law
 
 - Class objects are read from the loaded Python module namespace.
-- WL should not keep a parallel class-object registry.
+- A should not keep a parallel class-object registry.
 - The loaded module is already the authority for class definitions.
 
 Therefore:
 
 - module owns class namespace
-- WL does not duplicate class identity storage
+- A does not duplicate class identity storage
 
 ---
 
@@ -87,7 +87,7 @@ Therefore:
 
 - Service singleton ownership belongs to the service class itself.
 - Singleton identity should live on `cls.__instance__`.
-- WL should not keep a separate service-instance registry.
+- A should not keep a separate service-instance registry.
 
 Meaning:
 
@@ -118,4 +118,4 @@ This is preferred when per-access freshness probing becomes a measurable hot-pat
 - file owns realized content
 - service class owns singleton identity
 
-This split is preferred over duplicate WL registries and preferred over mixing topology, content, and singleton ownership in one layer.
+This split is preferred over duplicate A registries and preferred over mixing topology, content, and singleton ownership in one layer.

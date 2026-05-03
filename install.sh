@@ -1,2 +1,6 @@
-py -m pip uninstall -y wl
-py -m pip install -e /Users/alexander/dev/whitelabel
+pushd "$(dirname "$0")" > /dev/null
+
+py -m pip uninstall -y a
+py -m pip install -e .
+
+popd > /dev/null

@@ -13,7 +13,7 @@ from lib.tester    import Tester
 
 
 
-class WLMeta(type):
+class AMeta(type):
 
 	# Create class
 	# ----------------------------------------------------------------------
@@ -30,25 +30,27 @@ class WLMeta(type):
 
 		cls = super().__new__(mcls, name, bases, namespace)
 
-		Undefined.lib = cls
-
-		instance           = object.__new__(cls)
-		instance.__name__  = name.lower()
-		instance.__spec__  = None
+		instance              = object.__new__(cls)
+		instance.__name__     = name.lower()
+		instance.__spec__     = None
 		instance.__children__ = {}
 
-		Imports.__lib__ = instance
-		Tester.lib      = instance
+		Undefined.__lib__ = instance
+		Imports.__lib__   = instance
+		Tester.__lib__    = instance
 		
 		# Publish library name for import
 		module.__dict__[instance.__name__] = instance
 		sys.modules[instance.__name__]     = instance
+
+		module.__dict__['UNDEFINED'] = Undefined
 
 		cls.__path__     = path
 		cls.__lib_file__ = lib_file
 		cls.__lib_path__ = lib_path
 		cls.__instance__ = instance
 		cls.__PLUGINS__  = {}
+
 		cls.Tester       = Tester
 		cls.tester       = Tester
 
@@ -63,7 +65,7 @@ class WLMeta(type):
 		return cls
 
 
-class WL(metaclass=WLMeta, plugins=['Py']): # , 'Data', 'Text'
+class A(metaclass=AMeta, plugins=['Py']): # , 'Data', 'Text'
 	ModuleMeta   = ModuleMeta
 	Module       = Module
 	File         = File

@@ -3,13 +3,13 @@ requires = ["setuptools>=80"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "wl"
+name = "a"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = []
 
 [tool.setuptools]
-py-modules = ["wl"]
+py-modules = ["a"]
 
 [tool.setuptools.packages.find]
 where = ["."]

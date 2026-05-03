@@ -1,15 +1,15 @@
-# WhiteLabel invariants 1
+# Almasi invariants 1
 
 ## Python carrier law
 
 - Any `.py` file that is loaded through `py.py` is an own-module source file by law.
 - Such a file must define exactly one loadable class with the required `snake_to_camel` relationship between filename and class name.
-- That class must extend `wl.Module`.
-- If a `.py` file does not satisfy that contract, it is not a valid WL carrier and must not load through `WL` or `O`.
+- That class must extend `a.Module`.
+- If a `.py` file does not satisfy that contract, it is not a valid A carrier and must not load through `A` or `O`.
 
 ## Scope
 
-This file captures only the invariants established in the current conversation about `WL` / `WhiteLabel`.
+This file captures only the invariants established in the current conversation about `A` / `Almasi`.
 It is meant as a dense handoff note for implementation work.
 Older or alternative designs are not normative unless explicitly restated here.
 
@@ -17,9 +17,9 @@ Older or alternative designs are not normative unless explicitly restated here.
 
 ## Core ontology
 
-- `WL` is not an ordinary directory node.
-- `WL` is the loader law / world law.
-- Directories and files are materialized through `WL`; they are not identical to `WL` itself.
+- `A` is not an ordinary directory node.
+- `A` is the loader law / world law.
+- Directories and files are materialized through `A`; they are not identical to `A` itself.
 - Class inheritance and filesystem manifestation are different axes and must not be collapsed.
 
 ---
@@ -60,7 +60,7 @@ There are two different path roles and they must not be confused.
 - The intended shape is conceptually like:
 
 ```python
-class LLM(WL, path='/llm/core'):
+class LLM(A, path='/llm/core'):
 	pass
 ```
 
@@ -71,7 +71,7 @@ class LLM(WL, path='/llm/core'):
 
 ## Canonical head law
 
-- Each `WL`-family class has one canonical internal live head.
+- Each `A`-family class has one canonical internal live head.
 - This head is created in metaclass `__new__`.
 - The head is stored on the class, e.g. `cls.instance`.
 - The head receives the class-side `path`.
@@ -105,11 +105,11 @@ This is an unusual pattern and is intentional.
 - Module cache must be single for all subclasses in the lineage.
 - Module cache is not per-class.
 - Module cache is not per-instance.
-- Module cache lives on `WL` root class and is inherited/shared by subclasses.
+- Module cache lives on `A` root class and is inherited/shared by subclasses.
 - Therefore a declaration such as:
 
 ```python
-class WL(metaclass=WLMeta):
+class A(metaclass=AMeta):
 	__MODULE_CACHE__ = {}
 ```
 
@@ -152,21 +152,21 @@ Equivalent wording:
 - So something like `O.Model` should conceptually search:
   - `O.path`
   - then `LLM.path`
-  - then `WL.path`
+  - then `A.path`
 - This is filesystem-backed namespace inheritance.
 
 ---
 
-## Python import vs WL loading
+## Python import vs A loading
 
 These are different mechanisms.
 
 ### Python import
 
 - Used to load intrinsic classes that define the layer itself.
-- Example: loading the actual Python definition of `WL`, `LLM`, `O`, or intrinsic support classes.
+- Example: loading the actual Python definition of `A`, `LLM`, `O`, or intrinsic support classes.
 
-### WL loading
+### A loading
 
 - Used to materialize layer modules from authored filesystem roots during runtime resolution.
 - This is not the same thing as Python import.
@@ -214,7 +214,7 @@ The head must not contain:
 
 - Intrinsic core names should be installed explicitly in class bodies.
 - They should not be left to accidental filesystem discovery.
-- WL core anatomy should be explicit and load-bearing.
+- A core anatomy should be explicit and load-bearing.
 
 ---
 
@@ -223,7 +223,7 @@ The head must not contain:
 The current minimal intended shape is:
 
 ```python
-class WLMeta(type):
+class AMeta(type):
 
 	def __new__(mcls, name, bases, namespace, path=None):
 		cls = super().__new__(mcls, name, bases, namespace)
@@ -233,7 +233,7 @@ class WLMeta(type):
 		return cls
 
 
-class WL(metaclass=WLMeta):
+class A(metaclass=AMeta):
 
 	__MODULE_CACHE__ = {}
 ```
@@ -245,7 +245,7 @@ The invariants above are the actual law.
 
 ## Summary formula
 
-- `WL` is loader law, not directory node.
+- `A` is loader law, not directory node.
 - class-side `path` is authored root.
 - metaclass `__new__` receives `path`.
 - metaclass `__new__` creates one canonical class head.

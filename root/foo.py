@@ -1,7 +1,7 @@
-import wl
+import a
 
 
-class Foo(wl.Service):
+class Foo(a.Service):
 	
 	def initialize(self):
 		print('Foo initilized')
