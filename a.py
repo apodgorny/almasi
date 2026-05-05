@@ -62,6 +62,8 @@ class AMeta(type):
 			if plugin_cls is not None:
 				cls.__PLUGINS__[plugin_cls_name] = plugin_cls(instance)
 
+		instance.initialize()
+
 		return cls
 
 
@@ -140,7 +142,7 @@ class A(metaclass=AMeta, plugins=['Py']): # , 'Data', 'Text'
 	# Called when library is fully assembled and ready to work
 	# ----------------------------------------------------------------------
 	def initialize(self):
-		raise NotImplementedError(f'Library `{self.__name__}` must implement initialize()')
+		pass
 
 	# Create symlink
 	# ----------------------------------------------------------------------
