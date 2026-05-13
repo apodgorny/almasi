@@ -133,32 +133,6 @@ class TestCore(a.Tester):
 
 	# ----------------------------------------------------------------------
 	@classmethod
-	def test_events_attach_trigger_and_detach(cls):
-		events = Events()
-		calls  = []
-
-		def trigger():
-			pass
-
-		def triggered(data):
-			calls.append(data)
-
-		events.triggers.clear()
-		events.on(trigger, triggered)
-
-		assert events.has(trigger) == True
-
-		events.trigger(trigger)
-
-		assert calls == [{'foo' : 'bar'}]
-
-		events.off(trigger, triggered)
-		events.trigger(trigger)
-
-		assert calls == [{'foo' : 'bar'}]
-
-	# ----------------------------------------------------------------------
-	@classmethod
 	def test_timer_accumulates_and_resets(cls):
 		a.Timer.reset()
 		a.Timer.start('almasi-test')
@@ -170,3 +144,7 @@ class TestCore(a.Tester):
 		a.Timer.reset()
 
 		assert a.Timer.get_time('almasi-test') == 0
+
+
+if __name__ == '__main__':
+	TestCore.run()

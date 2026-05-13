@@ -91,3 +91,7 @@ class TestLibrary(a.Tester):
 
 		assert error is not None
 		assert 'test' in str(error)
+
+
+if __name__ == '__main__':
+	TestLibrary.run()

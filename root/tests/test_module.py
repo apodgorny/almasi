@@ -128,4 +128,10 @@ class TestModule(a.Tester):
 
 		assert RuntimeOnly.__has_own_module__ == False
 		assert '__route__' not in RuntimeOnly.__dict__
+		assert repr(RuntimeOnly) == '<class \'RuntimeOnly\'>'
+		assert repr(RuntimeOnly()) == '<Module \'RuntimeOnly\'>'
 		assert RuntimeOnly.value == 1
+
+
+if __name__ == '__main__':
+	TestModule.run()

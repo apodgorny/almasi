@@ -8,6 +8,7 @@ from lib.file      import File
 from lib.directory import Directory
 from lib.plugin    import Plugin
 from lib.undefined import Undefined
+from lib.dual      import DualMethod, DualProperty
 from lib.timer     import Timer
 from lib.tester    import Tester
 
@@ -67,17 +68,20 @@ class AMeta(type):
 		return cls
 
 
-class A(metaclass=AMeta, plugins=['Py']): # , 'Data', 'Text'
-	ModuleMeta   = ModuleMeta
-	Module       = Module
-	File         = File
-	Directory    = Directory
-	Plugin       = Plugin
-	Service      = Service
-	Imports      = Imports
-	Undefined    = Undefined
-	String       = String
-	Timer        = Timer
+class A(metaclass=AMeta, plugins=['Py', 'Json']):
+	ModuleMeta    = ModuleMeta
+	Module        = Module
+	File          = File
+	Directory     = Directory
+	Plugin        = Plugin
+	Service       = Service
+	Imports       = Imports
+	Undefined     = Undefined
+	String        = String
+	Timer         = Timer
+
+	dual_method   = DualMethod
+	dual_property = DualProperty
 
 	# Resolve attribute
 	# ----------------------------------------------------------------------

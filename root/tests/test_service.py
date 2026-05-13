@@ -41,7 +41,7 @@ class TestService(a.Tester):
 
 	# ----------------------------------------------------------------------
 	@classmethod
-	def test_service_is_singleton_and_initializes_once(cls):
+	def test_service_is_singleton_and_initializes_on_explicit_call(cls):
 		cls._remove_runtime()
 
 		try:
@@ -56,10 +56,28 @@ class TestService(a.Tester):
 					'\t\tself.value = 13\n'
 				)
 			)
-			one = a.tests_runtime.CountingService
-			two = a.tests_runtime.CountingService
+			one   = a.tests_runtime.CountingService
+			two   = a.tests_runtime.CountingService
+			error = None
+			init_error = None
+
+			try:
+				one.value
+			except AttributeError as e:
+				error = e
+
+			one.initialize()
+
+			try:
+				two.initialize()
+			except RuntimeError as e:
+				init_error = e
 
 			assert one is two
+			assert error is not None
+			assert init_error is not None
+			assert 'value' in str(error)
+			assert 'already initialized' in str(init_error)
 			assert one.value == 13
 			assert type(one).count == 1
 		finally:
@@ -102,3 +120,7 @@ class TestService(a.Tester):
 
 		assert error is not None
 		assert 'must implement __call__()' in str(error)
+
+
+if __name__ == '__main__':
+	TestService.run()

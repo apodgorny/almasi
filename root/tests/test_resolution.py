@@ -191,3 +191,7 @@ class TestResolution(a.Tester):
 
 			if 'resolutionchild' in sys.modules:
 				del sys.modules['resolutionchild']
+
+
+if __name__ == '__main__':
+	TestResolution.run()
