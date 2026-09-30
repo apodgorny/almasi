@@ -68,7 +68,7 @@ class AMeta(type):
 		return cls
 
 
-class A(metaclass=AMeta, plugins=['Py', 'Json']):
+class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text']):
 	ModuleMeta    = ModuleMeta
 	Module        = Module
 	File          = File

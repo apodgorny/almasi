@@ -58,12 +58,12 @@ class TestService(a.Tester):
 			)
 			one   = a.tests_runtime.CountingService
 			two   = a.tests_runtime.CountingService
-			error = None
+			error      = None
 			init_error = None
 
 			try:
 				one.value
-			except AttributeError as e:
+			except RuntimeError as e:
 				error = e
 
 			one.initialize()
@@ -76,10 +76,33 @@ class TestService(a.Tester):
 			assert one is two
 			assert error is not None
 			assert init_error is not None
-			assert 'value' in str(error)
+			assert 'not initialized' in str(error)
 			assert 'already initialized' in str(init_error)
 			assert one.value == 13
 			assert type(one).count == 1
+		finally:
+			cls._remove_runtime()
+
+	# ----------------------------------------------------------------------
+	@classmethod
+	def test_service_allows_default_getattr_during_initialize(cls):
+		cls._remove_runtime()
+
+		try:
+			cls._write_source(
+				'initializing_service.py',
+				(
+					'import a\n\n'
+					'class InitializingService(a.Service):\n\n'
+					'\tdef initialize(self):\n'
+					'\t\tself.value = getattr(self, ' + repr('missing') + ', 17)\n'
+				)
+			)
+			service = a.tests_runtime.InitializingService
+
+			service.initialize()
+
+			assert service.value == 17
 		finally:
 			cls._remove_runtime()
 
