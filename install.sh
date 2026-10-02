@@ -4,6 +4,8 @@ set -e
 
 pushd "$(dirname "$0")" > /dev/null
 
+ALMASI_PATH="$PWD"
+
 if [ -n "$VIRTUAL_ENV" ]; then
 	"$VIRTUAL_ENV/bin/python" -m pip install -e .
 	PYTHON="$VIRTUAL_ENV/bin/python"
@@ -20,7 +22,7 @@ fi
 
 cat > "$HOME/.local/bin/almasi" <<EOF
 #!/bin/sh
-exec "$PYTHON" "$PWD/bootstrap/almasi.py" "\$@"
+exec "$PYTHON" "$ALMASI_PATH/cli.py" "\$@"
 EOF
 
 chmod +x "$HOME/.local/bin/almasi"

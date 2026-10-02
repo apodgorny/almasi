@@ -23,7 +23,7 @@ class AMeta(type):
 		module       = sys.modules[module_name]
 		lib_file     = os.path.realpath(module.__file__)
 		lib_path     = os.path.dirname(lib_file)
-		path         = path or os.path.join(lib_path, 'root')
+		path         = os.path.abspath(os.path.join(lib_path, path or 'root'))  # Relative or absolute path is accepted
 		plugins_path = os.path.join(lib_path, 'plugins')
 
 		if not os.path.exists(path):
@@ -32,7 +32,7 @@ class AMeta(type):
 		cls = super().__new__(mcls, name, bases, namespace)
 
 		instance              = object.__new__(cls)
-		instance.__name__     = name.lower()
+		instance.__name__     = module_name #name.lower()
 		instance.__spec__     = None
 		instance.__children__ = {}
 
