@@ -136,7 +136,6 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text']):
 					value = plugin(name, parent_path, parent_route)
 					if value is not None: break
 				if value is not None: break
-		
 		return value
 
 	# ======================================================================
