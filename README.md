@@ -110,6 +110,26 @@ other_lib.bar
 
 Each library maintains its own structure and namespace while participating in the same runtime model.
 
+## Writing files
+
+`Directory.write(name, value)` writes a filename in an existing directory. The directory chooses the destination; the first matching plugin in library lineage serializes the value. The built-in writers support UTF-8 `.txt` / `.md` strings and `.json` data.
+
+```python
+docs = mylib.mkdir('docs')
+
+docs.write('intro.md', '# Welcome')
+docs.write('notes.txt', 'Hello, world!')
+mylib.write('scenario.json', {'title': 'Python Demo', 'scenes': []})
+
+intro    = docs.intro
+notes    = docs.notes
+scenario = mylib.scenario
+```
+
+Names must be single filenames, and symbolic-link destinations are rejected. Writers use ordinary file overwrite semantics and propagate serialization or filesystem errors. Reading keeps the resolver's existing plugin and extension priority, including when several files share a stem.
+
+A successful write clears the receiving directory's child-carrier cache. Root writes clear the library's child cache. This initial API does not invalidate other Directory instances or previously retained File carriers for the same physical path; those references may retain memoized content. Previously returned strings and dictionaries remain snapshots.
+
 ## CLI
 
 Almasi includes a CLI for creating libraries and applications:

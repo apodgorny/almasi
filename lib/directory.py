@@ -68,6 +68,67 @@ class Directory(File):
 	# PUBLIC METHODS
 	# ======================================================================
 
+	# Create nested directories and return the resolved directory.
+	# ----------------------------------------------------------------------
+	def mkdir(self, *parts):
+		names = []
+
+		if parts:
+			for part in parts:
+				if isinstance(part, str) and part and not os.path.isabs(part):
+					names.extend(part.split(os.sep))
+				else:
+					raise ValueError(f'Invalid directory path: {part}')
+
+			if all(name not in ('', '.', '..') for name in names):
+				directory = self
+
+				for name in names:
+					path = os.path.join(directory.path, name)
+
+					if not os.path.islink(path):
+						os.makedirs(path, exist_ok=True)
+						directory = getattr(directory, name)
+
+						if not isinstance(directory, Directory):
+							raise TypeError(f'Not a directory: {path}')
+					else:
+						raise ValueError(f'Symbolic link is not allowed: {path}')
+			else:
+				raise ValueError('Invalid directory path components')
+		else:
+			raise ValueError('Directory path is empty')
+
+		return directory
+
+	# Write a file using the plugin responsible for its format.
+	# ----------------------------------------------------------------------
+	def write(self, name, value):
+		if isinstance(name, str) and name and os.path.basename(name) == name and name not in ('.', '..'):
+			path = os.path.join(self.path, name)
+			ext  = os.path.splitext(name)[1].lstrip('.')
+
+			plugin = None
+
+			for instance in self.lib.__instances__():
+				for candidate in instance.__PLUGINS__.values():
+					if ext in candidate.EXTENSIONS:
+						plugin = candidate
+						break
+				if plugin is not None:
+					break
+
+			if plugin is not None:
+				if not os.path.islink(path):
+					plugin.write(path, value)
+					self.__children__.clear()
+				else:
+					raise ValueError(f'Symbolic link is not allowed: {path}')
+			else:
+				raise ValueError(f'Unsupported file extension: {ext}')
+		else:
+			raise ValueError(f'Invalid file name: {name}')
+
 	# Create symlink
 	# ----------------------------------------------------------------------
 	def link(self, name, path):

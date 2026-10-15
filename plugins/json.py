@@ -68,3 +68,10 @@ class Json(a.Plugin):
 				raise ValueError(f'Invalid JSON in `{file_path}`: {error}') from error
 
 		return value
+
+	# Serialize data into a JSON file.
+	# ----------------------------------------------------------------------
+	def write(self, path, value):
+		with open(path, 'w', encoding='utf-8') as file:
+			json.dump(value, file, indent=2, ensure_ascii=False)
+			file.write('\n')

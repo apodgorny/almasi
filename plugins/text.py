@@ -57,3 +57,12 @@ class Text(a.Plugin):
 				value = file.read()
 
 		return value
+
+	# Write UTF-8 text.
+	# ----------------------------------------------------------------------
+	def write(self, path, value):
+		if isinstance(value, str):
+			with open(path, 'w', encoding='utf-8') as file:
+				file.write(value)
+		else:
+			raise TypeError('Text content must be a string')

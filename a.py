@@ -147,6 +147,17 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text']):
 	def initialize(self):
 		pass
 
+	# Create directories relative to the library root.
+	# ----------------------------------------------------------------------
+	def mkdir(self, *parts):
+		return Directory(self, self.__path__, self.__name__).mkdir(*parts)
+
+	# Write a file into the library root.
+	# ----------------------------------------------------------------------
+	def write(self, name, value):
+		Directory(self, self.__path__, self.__name__).write(name, value)
+		self.__children__.clear()
+
 	# Create symlink
 	# ----------------------------------------------------------------------
 	def link(self, name, path):
