@@ -147,16 +147,30 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text']):
 	def initialize(self):
 		pass
 
+	# Join relative paths without mutating the library root.
+	# ----------------------------------------------------------------------
+	def join(self, *parts):
+		return Directory(self, self.__path__, self.__name__).join(*parts)
+
 	# Create directories relative to the library root.
 	# ----------------------------------------------------------------------
 	def mkdir(self, *parts):
 		return Directory(self, self.__path__, self.__name__).mkdir(*parts)
 
+	# Read an exact filename through the root namespace.
+	# ----------------------------------------------------------------------
+	def read(self, name):
+		return Directory(self, self.__path__, self.__name__).read(name)
+
 	# Write a file into the library root.
 	# ----------------------------------------------------------------------
 	def write(self, name, value):
 		Directory(self, self.__path__, self.__name__).write(name, value)
-		self.__children__.clear()
+
+	# Copy file bytes into the library root.
+	# ----------------------------------------------------------------------
+	def copy(self, name, source):
+		Directory(self, self.__path__, self.__name__).copy(name, source)
 
 	# Create symlink
 	# ----------------------------------------------------------------------

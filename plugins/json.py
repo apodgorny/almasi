@@ -1,6 +1,8 @@
 import os
 import json
 
+from functools import partial
+
 import a
 
 
@@ -12,22 +14,27 @@ class Json(a.Plugin):
 	# ----------------------------------------------------------------------
 	def __resolve__(self, name, parent_path):
 		file_path = None
-		ext       = None
-		names     = [name, self.lib.String.camel_to_snake(name)]
+		names     = [name] if os.path.splitext(name)[1] else [name, self.lib.String.camel_to_snake(name)]
 
 		for base_name in names:
-			for current_ext in self.EXTENSIONS:
-				current_path = os.path.join(parent_path, f'{base_name}.{current_ext}')
+			extension  = os.path.splitext(base_name)[1].lstrip('.')
+			candidates = []
 
+			if extension in self.EXTENSIONS:
+				candidates = [base_name]
+			elif not extension:
+				candidates = [f'{base_name}.{ext}' for ext in self.EXTENSIONS]
+
+			for candidate in candidates:
+				current_path = os.path.join(parent_path, candidate)
 				if os.path.isfile(current_path):
 					file_path = current_path
-					ext       = current_ext
 					break
 
 			if file_path is not None:
 				break
 
-		return file_path, ext
+		return file_path, os.path.splitext(file_path)[1].lstrip('.') if file_path is not None else None
 
 	# Resolve data carrier
 	# ----------------------------------------------------------------------
@@ -37,15 +44,10 @@ class Json(a.Plugin):
 		file           = None
 
 		if file_path is not None:
-			def load_method(): return self.load(file_path, ext)
-			def hash_method(): return os.path.getmtime(file_path)
-
 			file = self.lib.File(
-				self.lib,
-				file_path,
-				route,
-				load_method,
-				hash_method,
+				self.lib, file_path, route,
+				partial(self.load, file_path, ext),
+				partial(os.path.getmtime, file_path)
 			)
 
 		return file

@@ -2,6 +2,8 @@ import os
 import shutil
 import sys
 
+from unittest.mock import Mock
+
 import a
 
 
@@ -63,7 +65,7 @@ class TestResolution(a.Tester):
 			assert EagerCarrier.value == 11
 			assert isinstance(directory, a.Directory)
 			assert isinstance(carrier, a.File)
-			assert carrier.data is EagerCarrier
+			assert carrier._data is EagerCarrier
 		finally:
 			cls._remove_runtime()
 
@@ -92,33 +94,28 @@ class TestResolution(a.Tester):
 
 			directory = a.tests_runtime
 			children  = list(directory)
-			routes    = sorted(child.route for child in children)
+			routes    = sorted(child.get_route() for child in children)
 
 			assert routes == [
 				'a.tests_runtime.IterOne',
 				'a.tests_runtime.IterTwo',
 			]
 			assert all(isinstance(child, a.File) for child in children)
-			assert all(child.data is None for child in children)
+			assert all(child._data is None for child in children)
 		finally:
 			cls._remove_runtime()
 
 	# ----------------------------------------------------------------------
 	@classmethod
 	def test_file_load_is_memoized(cls):
-		count = {'value' : 0}
-
-		def load():
-			count['value'] += 1
-			return {'count' : count['value']}
-
+		load = Mock(return_value={'count': 1})
 		file = a.File(a, __file__, 'a.tests.FileMemo', load)
 		one  = file.load()
 		two  = file.load()
 
 		assert one is two
-		assert one == {'count' : 1}
-		assert count['value'] == 1
+		assert one == {'count': 1}
+		load.assert_called_once_with()
 
 	# ----------------------------------------------------------------------
 	@classmethod
@@ -126,7 +123,7 @@ class TestResolution(a.Tester):
 		directory = a.Directory(a, a.__path__, 'a')
 
 		assert directory.load() is directory
-		assert directory.is_directory == True
+		assert directory.is_directory()
 
 	# ----------------------------------------------------------------------
 	@classmethod
@@ -174,7 +171,7 @@ class TestResolution(a.Tester):
 	# 		thing     = directory.ParentThing
 
 	# 		assert thing.value == 31
-	# 		assert directory.path == os.path.realpath(os.path.join(child_path, 'tests_runtime', 'parent_dir'))
+	# 		assert directory.get_path() == os.path.realpath(os.path.join(child_path, 'tests_runtime', 'parent_dir'))
 	# 		assert thing.__route__ == 'resolutionchild.tests_runtime.parent_dir.ParentThing'
 	# 	finally:
 	# 		cls._remove_runtime()

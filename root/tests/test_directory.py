@@ -15,6 +15,19 @@ class TestDirectory(a.Tester):
 	# PUBLIC METHODS
 	# ======================================================================
 
+	# Create and resolve children in an explicitly supplied external directory.
+	# ----------------------------------------------------------------------
+	@classmethod
+	def test_external_directory(cls):
+		with tempfile.TemporaryDirectory() as path:
+			directory = a.Directory(a, path, 'a.output')
+			workspace = directory.mkdir('lesson', 'workspace')
+
+			workspace.write('scenario.json', {'title': 'External output'})
+
+			assert workspace.get_path() == os.path.realpath(os.path.join(path, 'lesson', 'workspace'))
+			assert directory.lesson.workspace.scenario == {'title': 'External output'}
+
 	# Round-trip supported text formats through the native namespace.
 	# ----------------------------------------------------------------------
 	@classmethod
@@ -144,7 +157,11 @@ class TestDirectory(a.Tester):
 			with patch.object(plugin, 'write', wraps=plugin.write) as write:
 				directory.write('notes.txt', 'text')
 
-				write.assert_called_once_with(os.path.join(path, 'notes.txt'), 'text')
+				assert write.call_count == 1
+				assert os.path.dirname(write.call_args.args[0]) == path
+				assert os.path.basename(write.call_args.args[0]).startswith('.almasi-')
+				assert write.call_args.args[0].endswith('.txt')
+				assert write.call_args.kwargs == {'value': 'text'}
 
 	# Delegate root writes and replace the library's cached child carrier.
 	# ----------------------------------------------------------------------

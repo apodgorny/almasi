@@ -110,9 +110,9 @@ other_lib.bar
 
 Each library maintains its own structure and namespace while participating in the same runtime model.
 
-## Writing files
+## Files and directories
 
-`Directory.write(name, value)` writes a filename in an existing directory. The directory chooses the destination; the first matching plugin in library lineage serializes the value. The built-in writers support UTF-8 `.txt` / `.md` strings and `.json` data.
+Almasi carriers expose identity through `get_path()`, `get_route()`, `get_lib()`, and `get_name()`. `is_directory()` is a method. Ordinary names such as `path`, `name`, `lib`, and `data` remain available to filesystem children.
 
 ```python
 docs = mylib.mkdir('docs')
@@ -120,15 +120,28 @@ docs = mylib.mkdir('docs')
 docs.write('intro.md', '# Welcome')
 docs.write('notes.txt', 'Hello, world!')
 mylib.write('scenario.json', {'title': 'Python Demo', 'scenes': []})
+docs.copy('narration.wav', source_filename)
 
-intro    = docs.intro
+intro    = docs.read('intro.md')
 notes    = docs.notes
 scenario = mylib.scenario
+filename = docs.join('images', 'cover.png')
 ```
 
-Names must be single filenames, and symbolic-link destinations are rejected. Writers use ordinary file overwrite semantics and propagate serialization or filesystem errors. Reading keeps the resolver's existing plugin and extension priority, including when several files share a stem.
+| Method | Semantics |
+|---|---|
+| `join(*parts)` | Validate a relative path without creating anything; `join()` returns the base |
+| `mkdir(*parts)` | Create directories and return a native directory face |
+| `read(name)` | Read an exact filename through its registered plugin |
+| `write(name, value)` | Serialize through a plugin and atomically replace the destination |
+| `copy(name, source)` | Copy regular-file bytes and atomically replace the destination |
+| `link(name, path)` | Create or retarget a filesystem mount |
 
-A successful write clears the receiving directory's child-carrier cache. Root writes clear the library's child cache. This initial API does not invalidate other Directory instances or previously retained File carriers for the same physical path; those references may retain memoized content. Previously returned strings and dictionaries remain snapshots.
+All six operations are also available on the library root. Paths must remain contained; absolute components, escaping traversal and unintended symlink writes are rejected. `write` supports UTF-8 `.txt` / `.md` and JSON; `copy` supports binary files and unknown extensions without serialization. Errors propagate as exceptions.
+
+Atomic writes and copies publish completed hidden temporary files with `os.replace`. Failures before replacement preserve the old destination and clean up temporary files. Atomic replacement does not promise power-loss durability. Successful mutations invalidate related carriers in the receiving namespace face while preserving unrelated cached resources. JSON `null` is memoized. Independently constructed faces and external edits are not globally refreshed.
+
+See [the current filesystem invariants](docs/almasi_invariants8.md) for identity, reserved names, inheritance and cache scope.
 
 ## CLI
 

@@ -127,7 +127,7 @@ class TestService(a.Tester):
 		file   = plugin('RuntimeThing', a.__path__, 'a')
 
 		assert plugin.lib is a
-		assert file.route == 'a.RuntimeThing'
+		assert file.get_route() == 'a.RuntimeThing'
 		assert file.load() == 'a'
 
 	# ----------------------------------------------------------------------

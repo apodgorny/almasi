@@ -3,47 +3,70 @@ import os
 
 class File:
 
-	# Create file.
-	# ------------------------------------------------------------------
+	# Keep identity separate from the filesystem namespace.
+	# ----------------------------------------------------------------------
 	def __init__(self, lib, path, route, load_method=None, hash_method=None):
-		self.lib          = lib
-		self.path         = os.path.realpath(path)
-		self.route        = route
-		self.is_directory = False
-		self.name         = os.path.basename(self.path)
+		self.__lib__   = lib
+		self.__path__  = os.path.realpath(path)
+		self.__route__ = route
 
-		self.data         = None
-		self.hash         = None
+		self._data   = None
+		self._hash   = None
+		self._loaded = False
 
-		self.load_method  = load_method
-		self.hash_method  = hash_method
+		self._load_method = load_method
+		self._hash_method = hash_method
 
-	# String representation.
-	# ------------------------------------------------------------------
+	# Describe the carrier without realizing its content.
+	# ----------------------------------------------------------------------
 	def __repr__(self):
-		cls_name = type(self).__name__
-		return f'<{cls_name} `{self.route}` path=`{self.path}`>'
+		return f'<{type(self).__name__} `{self.get_route()}` path=`{self.get_path()}`>'
+
+	# ======================================================================
+	# PRIVATE METHODS
+	# ======================================================================
+
+	# Forget content after a successful filesystem mutation.
+	# ----------------------------------------------------------------------
+	def _invalidate(self):
+		self._data   = None
+		self._hash   = None
+		self._loaded = False
 
 	# ======================================================================
 	# PUBLIC METHODS
 	# ======================================================================
 
-	# Load file into target object.
-	# ------------------------------------------------------------------
+	# Get the canonical physical path.
+	# ----------------------------------------------------------------------
+	def get_path(self):
+		return self.__path__
+
+	# Get the logical namespace route.
+	# ----------------------------------------------------------------------
+	def get_route(self):
+		return self.__route__
+
+	# Get the owning library.
+	# ----------------------------------------------------------------------
+	def get_lib(self):
+		return self.__lib__
+
+	# Get the physical filename or directory name.
+	# ----------------------------------------------------------------------
+	def get_name(self):
+		return os.path.basename(self.__path__)
+
+	# Distinguish file carriers from directory carriers.
+	# ----------------------------------------------------------------------
+	def is_directory(self):
+		return False
+
+	# Memoize legitimate null values as well as other plugin results.
+	# ----------------------------------------------------------------------
 	def load(self):
-		# data = self.data
+		if not self._loaded and self._load_method is not None:
+			self._data   = self._load_method()
+			self._loaded = True
 
-		if self.load_method is not None:
-			# if self.hash_method is not None:
-			# 	fresh_hash = self.hash_method()
-			# 	if fresh_hash != self.hash:
-			# 		self.data = self.load_method()
-			# 		self.hash = fresh_hash
-			# 	data = self.data
-			# else:
-			# 	data = self.load_method()
-			if self.data is None:
-				self.data = self.load_method()
-			return self.data
-
-		return None
+		return self._data

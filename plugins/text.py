@@ -1,5 +1,7 @@
 import os
 
+from functools import partial
+
 import a
 
 
@@ -11,12 +13,19 @@ class Text(a.Plugin):
 	# ----------------------------------------------------------------------
 	def __resolve__(self, name, parent_path):
 		file_path = None
-		names     = [name, self.lib.String.camel_to_snake(name)]
+		names     = [name] if os.path.splitext(name)[1] else [name, self.lib.String.camel_to_snake(name)]
 
 		for base_name in names:
-			for ext in self.EXTENSIONS:
-				current_path = os.path.join(parent_path, f'{base_name}.{ext}')
+			extension  = os.path.splitext(base_name)[1].lstrip('.')
+			candidates = []
 
+			if extension in self.EXTENSIONS:
+				candidates = [base_name]
+			elif not extension:
+				candidates = [f'{base_name}.{ext}' for ext in self.EXTENSIONS]
+
+			for candidate in candidates:
+				current_path = os.path.join(parent_path, candidate)
 				if os.path.isfile(current_path):
 					file_path = current_path
 					break
@@ -34,15 +43,10 @@ class Text(a.Plugin):
 		file      = None
 
 		if file_path is not None:
-			def load_method(): return self.load(file_path)
-			def hash_method(): return os.path.getmtime(file_path)
-
 			file = self.lib.File(
-				self.lib,
-				file_path,
-				route,
-				load_method,
-				hash_method,
+				self.lib, file_path, route,
+				partial(self.load, file_path),
+				partial(os.path.getmtime, file_path)
 			)
 
 		return file

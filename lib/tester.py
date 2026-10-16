@@ -125,7 +125,7 @@ class Tester(Module):
 
 		if tests_dir is not None:
 			for test in tests_dir:
-				if test.name.startswith('test'):
+				if test.get_name().startswith('test'):
 					t_cls = test.load()
 
 					if isinstance(t_cls, type) and issubclass(t_cls, cls) and t_cls is not cls:
