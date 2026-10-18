@@ -10,6 +10,7 @@ from lib.plugin    import Plugin
 from lib.undefined import Undefined
 from lib.dual      import DualMethod, DualProperty
 from lib.timer     import Timer
+from lib.spinner   import Spinner
 from lib.tester    import Tester
 
 
@@ -68,7 +69,7 @@ class AMeta(type):
 		return cls
 
 
-class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text']):
+class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	ModuleMeta    = ModuleMeta
 	Module        = Module
 	File          = File
@@ -79,6 +80,7 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text']):
 	Undefined     = Undefined
 	String        = String
 	Timer         = Timer
+	Spinner       = Spinner
 
 	dual_method   = DualMethod
 	dual_property = DualProperty

@@ -222,7 +222,7 @@ class Directory(File):
 
 	# Serialize through the format owner and atomically replace the destination.
 	# ----------------------------------------------------------------------
-	def write(self, name, value):
+	def write(self, name, value=''):
 		path   = self._destination(name)
 		plugin = self._plugin(name)
 

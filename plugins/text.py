@@ -7,7 +7,7 @@ import a
 
 class Text(a.Plugin):
 
-	EXTENSIONS = ('txt', 'md', 'js', 'css', 'html')
+	EXTENSIONS = ('txt', 'log', 'md', 'js', 'css', 'html')
 
 	# Resolve text file
 	# ----------------------------------------------------------------------
