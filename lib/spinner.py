@@ -27,7 +27,7 @@ class Spinner:
 	def __exit__(self, exc_type, exc_value, traceback):
 		self._spinner.__exit__(exc_type, exc_value, traceback)
 		if exc_type is None:
-			print(self._spinner.text + ' \033[32m✓\033[0m' if self.done_label is None else self.done_label)
+			print('\033[1;32m✔\033[0m ' + self._spinner.text if self.done_label is None else self.done_label)
 
 	# Share the same entry lifecycle with asynchronous operations.
 	# ----------------------------------------------------------------------
