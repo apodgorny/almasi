@@ -190,7 +190,7 @@ class TestFilesystem(a.Tester):
 			directory.write('missing.md.txt', 'other file')
 			directory.write('snake_name.md', 'different filename')
 
-			for name in ('../notes.md', 'notes.bin', '/absolute.md'):
+			for name in ('../notes.md', 'notes.unsupported', '/absolute.md'):
 				with TestCase().assertRaises(ValueError):
 					directory.read(name)
 			for name in ('missing.md', 'SnakeName.md'):
