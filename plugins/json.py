@@ -37,15 +37,16 @@ class Json(a.Plugin):
 		return file_path, os.path.splitext(file_path)[1].lstrip('.') if file_path is not None else None
 
 	# Resolve data carrier
+	# source_lib owns the file being loaded; self.lib owns this loader.
 	# ----------------------------------------------------------------------
-	def __call__(self, name, parent_path, parent_route):
+	def __call__(self, name, parent_path, parent_route, source_lib):
 		file_path, ext = self.__resolve__(name, parent_path)
 		route          = f'{parent_route}.{name}'
 		file           = None
 
 		if file_path is not None:
 			file = self.lib.File(
-				self.lib, file_path, route,
+				source_lib, file_path, route,
 				partial(self.load, file_path, ext),
 				partial(os.path.getmtime, file_path)
 			)

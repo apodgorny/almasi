@@ -56,15 +56,16 @@ class Directory(File):
 					is_dir      = os.path.isdir(parent_path)
 
 					if is_dir:
+						# Keep plugin priority separate from the layer supplying this file.
 						library = instance if route == '.' else self.get_lib()
-						value   = library.__resolve__(name, parent_path, self.get_route())
+						value   = library.__resolve__(name, parent_path, self.get_route(), source_lib=instance)
 
 						if value is not None:
 							self.__children__[name] = value
 							break
 
 			if route is None:
-				value = self.get_lib().__resolve__(name, path, self.get_route())
+				value = self.get_lib().__resolve__(name, path, self.get_route(), source_lib=self.get_lib())
 
 				if value is not None:
 					self.__children__[name] = value

@@ -5,7 +5,7 @@ import importlib.util
 
 class Imports:
 
-	# Load module
+	# Load once with the explicitly supplied library, never the last imported one.
 	# ----------------------------------------------------------------------
 	@classmethod
 	def load_module(cls, lib, path, route=None, namespace=None):
@@ -16,10 +16,10 @@ class Imports:
 			spec   = importlib.util.spec_from_file_location(path, path)
 			module = importlib.util.module_from_spec(spec)
 
-			module.__lib__   = cls.__lib__
+			module.__lib__   = lib
 			module.__route__ = route
 			module.__mtime__ = os.path.getmtime(path)
-			module.__dict__['UNDEFINED'] = cls.__lib__.Undefined
+			module.__dict__['UNDEFINED'] = lib.Undefined
 
 			sys.modules[path] = module
 

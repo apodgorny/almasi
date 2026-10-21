@@ -66,3 +66,24 @@ Successful mutations invalidate related bindings and reset affected retained fil
 Previously returned values remain snapshots. Independently constructed directory faces, inherited consumer faces already holding a cached resource, and external filesystem edits have no automatic global invalidation. There is no new global registry or freshness policy. Callers that need one coherent mutation/read lifetime should retain and use the same namespace face.
 
 Python module identity remains authoritative in `sys.modules`; service identity remains owned by the service class. Replacing a Python source file does not introduce module reload semantics. The root `test.py` runner is excluded from component discovery across inherited library roots.
+
+## Explicit source ownership
+
+The resolver passes the library whose filesystem layer supplied the component as
+`source_lib`, through the existing plugin call:
+
+```python
+plugin(name, parent_path, parent_route, source_lib=source_lib)
+```
+
+`Plugin.lib` remains the owner of the loader plugin. It is separate from
+`source_lib`: an inherited loader can load a file supplied by another library.
+File carriers and newly loaded Python modules retain the supplied source library.
+An inherited component keeps its defining layer; a local override belongs to its
+local layer. Plugin priority and namespace traversal remain unchanged.
+
+`Imports.load_module(lib, ...)` uses its explicit `lib` argument. The shared
+`Imports.__lib__` value does not determine module ownership. Cached modules in
+`sys.modules` are reused without rebinding their owner or changing class/service
+identity. This refines the older three-argument plugin call shape in invariants 5;
+custom loader plugins must accept and forward the explicit `source_lib` argument.

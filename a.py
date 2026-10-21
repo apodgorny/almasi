@@ -95,7 +95,7 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 			if value is not None:
 				break
 
-			value = instance.__resolve__(name, instance.__path__, self.__name__)
+			value = instance.__resolve__(name, instance.__path__, self.__name__, source_lib=instance)
 			if value is not None:
 				instance.__children__[name] = value
 				break
@@ -122,20 +122,21 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 			if cls != object:
 				yield cls.__instance__
 
-	# Main resolution router
+	# Resolve using the existing plugin order.
+	# source_lib owns the file; the selected plugin may belong to another library.
 	# ----------------------------------------------------------------------
-	def __resolve__(self, name, parent_path, parent_route):
+	def __resolve__(self, name, parent_path, parent_route, source_lib):
 		value = None
 		path  = os.path.realpath(os.path.join(parent_path, name))
 
 		if parent_path == self.__path__ and name in ['test', 'test.py']:
 			value = None
 		elif os.path.isdir(path):
-			return Directory(self, path, f'{parent_route}.{name}')
+			value = Directory(self, path, f'{parent_route}.{name}')
 		else:
 			for instance in self.__instances__():
 				for plugin_name, plugin in instance.__PLUGINS__.items():
-					value = plugin(name, parent_path, parent_route)
+					value = plugin(name, parent_path, parent_route, source_lib=source_lib)
 					if value is not None: break
 				if value is not None: break
 		return value

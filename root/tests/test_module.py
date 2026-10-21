@@ -61,7 +61,7 @@ class TestModule(a.Tester):
 			SourceCarrier = a.tests_runtime.SourceCarrier
 			module        = sys.modules[os.path.realpath(path)]
 
-			assert module.__lib__ is a.Imports.__lib__
+			assert module.__lib__ is a
 			assert module.__route__ == 'a.tests_runtime.SourceCarrier'
 			assert SourceCarrier.__route__ == 'a.tests_runtime.SourceCarrier'
 			assert SourceCarrier.__has_own_module__ == True

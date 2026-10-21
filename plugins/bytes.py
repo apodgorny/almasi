@@ -14,8 +14,9 @@ class Bytes(a.Plugin):
 	# ======================================================================
 
 	# Resolve binary resources through the same native carriers as other formats.
+	# source_lib owns the file being loaded; self.lib owns this loader.
 	# ----------------------------------------------------------------------
-	def __call__(self, name, parent_path, parent_route):
+	def __call__(self, name, parent_path, parent_route, source_lib):
 		file  = None
 		bases = [name] if os.path.splitext(name)[1] else [name, self.lib.String.camel_to_snake(name)]
 		for base in bases:
@@ -24,7 +25,7 @@ class Bytes(a.Plugin):
 				path = os.path.join(parent_path, candidate)
 				if os.path.splitext(candidate)[1].lstrip('.') in self.EXTENSIONS and os.path.isfile(path):
 					file = self.lib.File(
-						self.lib, path, f'{parent_route}.{name}',
+						source_lib, path, f'{parent_route}.{name}',
 						partial(self.load, path),
 						partial(os.path.getmtime, path),
 					)

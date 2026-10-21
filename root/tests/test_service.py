@@ -109,7 +109,7 @@ class TestService(a.Tester):
 	# ----------------------------------------------------------------------
 	@classmethod
 	def test_plugin_receives_owning_lib(cls):
-		def call(self, name, parent_path, parent_route):
+		def call(self, name, parent_path, parent_route, source_lib):
 			value = None
 
 			if name == 'RuntimeThing':
@@ -124,7 +124,7 @@ class TestService(a.Tester):
 
 		RuntimePlugin = type('RuntimePlugin', (a.Plugin,), {'__call__' : call})
 		plugin = RuntimePlugin(a)
-		file   = plugin('RuntimeThing', a.__path__, 'a')
+		file   = plugin('RuntimeThing', a.__path__, 'a', source_lib=a)
 
 		assert plugin.lib is a
 		assert file.get_route() == 'a.RuntimeThing'
@@ -137,7 +137,7 @@ class TestService(a.Tester):
 		error  = None
 
 		try:
-			plugin('Name', a.__path__, 'a')
+			plugin('Name', a.__path__, 'a', source_lib=a)
 		except NotImplementedError as e:
 			error = e
 
