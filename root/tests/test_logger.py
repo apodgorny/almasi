@@ -3,12 +3,15 @@
 # ======================================================================
 
 import asyncio
+import contextvars
 import io
 import logging
 import tempfile
+import threading
 
-from contextlib    import redirect_stdout
-from unittest.mock import MagicMock, patch
+from concurrent.futures import ThreadPoolExecutor
+from contextlib         import redirect_stdout
+from unittest.mock      import MagicMock, patch
 
 import a
 
@@ -131,6 +134,51 @@ class TestLogger(a.Tester):
 		finally:
 			root.setLevel(original)
 			third.setLevel(old_level)
+
+	# Respect a named logger's threshold before routing eligible records.
+	# ----------------------------------------------------------------------
+	@classmethod
+	def test_named_logger_level(cls):
+		logger = logging.getLogger('logger_level_contract')
+		level  = logger.level
+		try:
+			with tempfile.TemporaryDirectory() as path:
+				directory = a.Directory(a, path, 'level_contract')
+				logger.setLevel(logging.WARNING)
+				with a.Logger().logging(directory):
+					logger.info('suppressed')
+					logger.warning('visible warning')
+					logger.setLevel(logging.INFO)
+					logger.info('visible info')
+				content = directory.read('log.txt')
+				assert 'suppressed' not in content
+				assert 'visible warning' in content and 'visible info' in content
+		finally:
+			logger.setLevel(level)
+
+	# Concurrent threads must reserve and write distinct artifact numbers.
+	# ----------------------------------------------------------------------
+	@classmethod
+	def test_threaded_artifact_numbering(cls):
+		with tempfile.TemporaryDirectory() as path:
+			directory = a.Directory(a, path, 'threaded_artifacts')
+			barrier   = threading.Barrier(8)
+
+			def emit(index):
+				barrier.wait(timeout=10)
+				logging.info('input', extra={
+					'artifact_name' : 'input_Thread.txt',
+					'artifact_data' : str(index),
+				})
+
+			with a.Logger().logging(directory), ThreadPoolExecutor(max_workers=8) as pool:
+				futures = [pool.submit(contextvars.copy_context().run, emit, index) for index in range(8)]
+				for future in futures:
+					future.result(timeout=10)
+
+			filenames = sorted(child.get_name() for child in directory if child.get_name().startswith('input_Thread_'))
+			assert filenames == [f'input_Thread_{index:03d}.txt' for index in range(1, 9)]
+			assert {directory.read(name) for name in filenames} == {str(index) for index in range(8)}
 
 	# Check dynamic labels and terminal outcomes using the existing renderer.
 	# ----------------------------------------------------------------------

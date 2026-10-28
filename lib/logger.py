@@ -1,5 +1,8 @@
 # ======================================================================
 # Route standard logging into dynamically scoped Almasi directories.
+# Respect the emitting logger's configured level; capture eligible INFO+ events.
+# Artifact numbering is serialized by the shared logging Handler's lock.
+# Uniqueness across separate processes is not provided.
 # ======================================================================
 
 import contextvars
@@ -71,7 +74,7 @@ class Logger(Module):
 	# PRIVATE METHODS
 	# ======================================================================
 
-	# Preserve extensions and number independently for each event name.
+	# Called by the locked handler; numbering and writing form one operation.
 	# ----------------------------------------------------------------------
 	def _artifact(self, directory, record):
 		name = record.artifact_name
