@@ -9,10 +9,22 @@ class Spinner:
 
 	# Load terminal rendering only when progress is requested.
 	# ----------------------------------------------------------------------
-	def __init__(self, *args, done_label=None, **kwargs):
+	def __init__(self, *args, done_label=None, failure_label=None, **kwargs):
 		from yaspin import yaspin
 		self._spinner   = yaspin(*args, **kwargs)
 		self.done_label = done_label
+		self.failure_label = failure_label
+
+	# Refresh the active label without starting another terminal renderer.
+	# ----------------------------------------------------------------------
+	def update(self, text):
+		self._spinner.text = text
+
+	# Report persisted work without starting a spinner.
+	# ----------------------------------------------------------------------
+	@staticmethod
+	def skipped(text):
+		print('\033[90m✔ ' + text + ' — skipped\033[0m')
 
 	# Keep the cursor hidden while the operation is active.
 	# ----------------------------------------------------------------------
@@ -28,6 +40,8 @@ class Spinner:
 		self._spinner.__exit__(exc_type, exc_value, traceback)
 		if exc_type is None:
 			print('\033[1;32m✔\033[0m ' + self._spinner.text if self.done_label is None else self.done_label)
+		elif self.failure_label is not None:
+			print(self.failure_label)
 
 	# Share the same entry lifecycle with asynchronous operations.
 	# ----------------------------------------------------------------------

@@ -3,6 +3,7 @@ import os, sys
 from lib.imports   import Imports
 from lib.module    import Module, ModuleMeta
 from lib.service   import Service
+from lib.logger    import Logger
 from lib.string    import String
 from lib.file      import File
 from lib.directory import Directory
@@ -72,6 +73,7 @@ class AMeta(type):
 class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	ModuleMeta    = ModuleMeta
 	Module        = Module
+	Logger        = Logger
 	File          = File
 	Directory     = Directory
 	Plugin        = Plugin
