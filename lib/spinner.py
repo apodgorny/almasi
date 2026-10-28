@@ -4,7 +4,7 @@ import sys
 class Spinner:
 
 	# ======================================================================
-	# PUBLIC METHODS
+	# FRAMEWORK METHODS
 	# ======================================================================
 
 	# Load terminal rendering only when progress is requested.
@@ -14,17 +14,6 @@ class Spinner:
 		self._spinner   = yaspin(*args, **kwargs)
 		self.done_label = done_label
 		self.failure_label = failure_label
-
-	# Refresh the active label without starting another terminal renderer.
-	# ----------------------------------------------------------------------
-	def update(self, text):
-		self._spinner.text = text
-
-	# Report persisted work without starting a spinner.
-	# ----------------------------------------------------------------------
-	@staticmethod
-	def skipped(text):
-		print('\033[90m✔ ' + text + ' — skipped\033[0m')
 
 	# Keep the cursor hidden while the operation is active.
 	# ----------------------------------------------------------------------
@@ -52,3 +41,19 @@ class Spinner:
 	# ----------------------------------------------------------------------
 	async def __aexit__(self, exc_type, exc_value, traceback):
 		self.__exit__(exc_type, exc_value, traceback)
+
+	# ======================================================================
+	# PUBLIC METHODS
+	# ======================================================================
+
+
+	# Refresh the active label without starting another terminal renderer.
+	# ----------------------------------------------------------------------
+	def update(self, text):
+		self._spinner.text = text
+
+	# Report persisted work without starting a spinner.
+	# ----------------------------------------------------------------------
+	@staticmethod
+	def skipped(text):
+		print('\033[90m✔ ' + text + ' — skipped\033[0m')

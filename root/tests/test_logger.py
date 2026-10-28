@@ -101,6 +101,37 @@ class TestLogger(a.Tester):
 			assert 'beta' not in directory.alpha.read('log.txt')
 			assert 'alpha' not in directory.beta.read('log.txt')
 
+	# Preserve external logger changes and surface required artifact failures.
+	# ----------------------------------------------------------------------
+	@classmethod
+	def test_logging_policy(cls):
+		root      = logging.getLogger()
+		original  = root.level
+		third     = logging.getLogger('logger_policy')
+		old_level = third.level
+		third.setLevel(logging.WARNING)
+		try:
+			with tempfile.TemporaryDirectory() as path:
+				directory = a.Directory(a, path, 'policy')
+				with a.Logger().logging(directory):
+					assert third.level == logging.WARNING
+					root.setLevel(logging.ERROR)
+					third.setLevel(logging.ERROR)
+				assert root.level == logging.ERROR and third.level == logging.ERROR
+
+			with tempfile.TemporaryDirectory() as path:
+				directory = a.Directory(a, path, 'artifact_failure')
+				with a.Logger().logging(directory), patch.object(a.Logger, '_artifact', side_effect=OSError('disk full')):
+					try:
+						logging.warning('artifact', extra={'artifact_name': 'input.txt', 'artifact_data': 'text'})
+					except OSError:
+						pass
+					else:
+						raise AssertionError('Artifact failure was swallowed')
+		finally:
+			root.setLevel(original)
+			third.setLevel(old_level)
+
 	# Check dynamic labels and terminal outcomes using the existing renderer.
 	# ----------------------------------------------------------------------
 	@classmethod

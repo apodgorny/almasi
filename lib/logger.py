@@ -19,7 +19,7 @@ class LogRoute(logging.Handler):
 	# PUBLIC METHODS
 	# ======================================================================
 
-	# Route each event using the emitting task's context.
+	# Require successful artifact and log writes for the active execution.
 	# ----------------------------------------------------------------------
 	def emit(self, record):
 		contexts = Logger._contexts.get()
@@ -58,13 +58,14 @@ class LogTerminalFilter(logging.Filter):
 
 class Logger(Module):
 
-	_contexts = contextvars.ContextVar('almasi_log_directories', default=())
-	_lock     = threading.RLock()
-	_users    = 0
-	_handler  = None
-	_filters  = ()
-	_level    = None
-	_loggers  = ()
+	_contexts     = contextvars.ContextVar('almasi_log_directories', default=())
+	_lock         = threading.RLock()
+	_users        = 0
+	_handler      = None
+	_filters      = ()
+	_level        = None
+	_loggers      = ()
+	_active_level = None
 
 	# ======================================================================
 	# PRIVATE METHODS
@@ -115,16 +116,15 @@ class Logger(Module):
 				for candidate in logging.Logger.manager.loggerDict.values():
 					if isinstance(candidate, logging.Logger):
 						handlers.update(candidate.handlers)
-				Logger._loggers = tuple((candidate, candidate.level) for candidate in logging.Logger.manager.loggerDict.values() if isinstance(candidate, logging.Logger))
-				for candidate, level in Logger._loggers:
-					candidate.setLevel(min(level, logging.INFO))
-					if not candidate.propagate:
-						candidate.addHandler(Logger._handler)
+				Logger._loggers = tuple(candidate for candidate in logging.Logger.manager.loggerDict.values() if isinstance(candidate, logging.Logger) and not candidate.propagate)
+				for candidate in Logger._loggers:
+					candidate.addHandler(Logger._handler)
 				Logger._filters = tuple((handler, terminal_filter) for handler in handlers)
 				for handler, event_filter in Logger._filters:
 					handler.addFilter(event_filter)
 				root.addHandler(Logger._handler)
-				root.setLevel(min(root.level, logging.INFO))
+				Logger._active_level = min(root.level, logging.INFO)
+				root.setLevel(Logger._active_level)
 			Logger._users += 1
 
 	# Restore the logging configuration after the last context exits.
@@ -139,11 +139,11 @@ class Logger(Module):
 				Logger._handler.close()
 				for handler, event_filter in Logger._filters:
 					handler.removeFilter(event_filter)
-				for candidate, level in Logger._loggers:
+				for candidate in Logger._loggers:
 					candidate.removeHandler(Logger._handler)
-					candidate.setLevel(level)
 				Logger._loggers = ()
-				root.setLevel(Logger._level)
+				if root.level == Logger._active_level:
+					root.setLevel(Logger._level)
 				Logger._handler = None
 				Logger._filters = ()
 

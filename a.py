@@ -18,6 +18,10 @@ from lib.tester    import Tester
 
 class AMeta(type):
 
+	# ======================================================================
+	# FRAMEWORK METHODS
+	# ======================================================================
+
 	# Create class
 	# ----------------------------------------------------------------------
 	def __new__(mcls, name, bases, namespace, path=None, plugins=None):
@@ -86,6 +90,10 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 
 	dual_method   = DualMethod
 	dual_property = DualProperty
+
+	# ======================================================================
+	# FRAMEWORK METHODS
+	# ======================================================================
 
 	# Resolve attribute
 	# ----------------------------------------------------------------------
