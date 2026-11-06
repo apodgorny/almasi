@@ -22,10 +22,16 @@ from lib.spinner   import Spinner
 from lib.tester    import Tester
 
 
-# Python calls a directly executed file '__main__', not by its filename.
+# The library is created inside Almasi, not inside its source file.
+# Skip Almasi calls to see whether that source is running as '__main__'.
 # ----------------------------------------------------------------------
-def _is_main_module(module_name):
-	return module_name == '__main__'
+def _is_main_module():
+	frame = sys._getframe(1)
+
+	while frame is not None and frame.f_globals.get('__name__') == __name__:
+		frame = frame.f_back
+
+	return frame is not None and frame.f_globals.get('__name__') == '__main__'
 
 
 class AMeta(type):
@@ -51,7 +57,7 @@ class AMeta(type):
 
 		instance              = object.__new__(cls)
 		instance.__name__     = module_name
-		if is_created_using_extend and _is_main_module(module_name):
+		if is_created_using_extend and _is_main_module():
 			instance.__name__ = String.camel_to_snake(name)
 		instance.__spec__     = None
 		instance.__children__ = {}
@@ -189,10 +195,9 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 			and not keyword.iskeyword(name)
 			and name == self.String.camel_to_snake(self.String.snake_to_camel(name))
 		)
-		is_direct_execution = _is_main_module(module_name)
-		source_name         = module_name.rsplit('.', 1)[-1]
+		source_name = module_name.rsplit('.', 1)[-1]
 
-		if is_direct_execution:
+		if _is_main_module():
 			source_name = os.path.splitext(os.path.basename(module.__file__))[0]
 
 		is_matching_source = source_name == name
@@ -203,7 +208,7 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 		if not is_matching_source:
 			raise ValueError(f'Library `{name}` must match its Python module name')
 
-		full_name         = name if is_direct_execution else module_name
+		full_name         = name if _is_main_module() else module_name
 		is_name_available = full_name not in sys.modules or sys.modules[full_name] is module
 
 		if not is_name_available:
