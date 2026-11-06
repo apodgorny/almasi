@@ -1,3 +1,10 @@
+# ==============================================================================
+# ALMASI LIBRARY
+# ==============================================================================
+# Build canonical libraries with inherited filesystem namespaces.
+# ==============================================================================
+
+import keyword
 import os, sys
 
 from lib.imports   import Imports
@@ -35,10 +42,14 @@ class AMeta(type):
 		if not os.path.exists(path):
 			raise ValueError(f'Could not define class `{name}`. Path `{path}` does not exist')
 
+		is_extended = namespace.pop('__extended__', False)
+
 		cls = super().__new__(mcls, name, bases, namespace)
 
 		instance              = object.__new__(cls)
-		instance.__name__     = module_name #name.lower()
+		instance.__name__     = module_name
+		if is_extended and module_name == '__main__':
+			instance.__name__ = String.camel_to_snake(name)
 		instance.__spec__     = None
 		instance.__children__ = {}
 
@@ -69,7 +80,8 @@ class AMeta(type):
 			if plugin_cls is not None:
 				cls.__PLUGINS__[plugin_cls_name] = plugin_cls(instance)
 
-		instance.initialize()
+		if not is_extended:
+			instance.initialize()
 
 		return cls
 
@@ -159,6 +171,50 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	# ----------------------------------------------------------------------
 	def initialize(self):
 		pass
+
+	# Extend the namespace through an explicit, canonical library name.
+	# Initialization belongs to the caller after extend() returns.
+	# ----------------------------------------------------------------------
+	def extend(self, name, path='root', plugins=None):
+		caller      = sys._getframe(1).f_globals
+		module_name = caller['__name__']
+		module      = sys.modules[module_name]
+
+		is_valid_name = (
+			isinstance(name, str)
+			and name.isidentifier()
+			and not keyword.iskeyword(name)
+			and name == self.String.camel_to_snake(self.String.snake_to_camel(name))
+		)
+		is_direct_execution = module_name == '__main__'
+		source_name         = module_name.rsplit('.', 1)[-1]
+
+		if is_direct_execution:
+			source_name = os.path.splitext(os.path.basename(module.__file__))[0]
+
+		is_matching_source = source_name == name
+
+		if not is_valid_name:
+			raise ValueError(f'Invalid library name: `{name}`')
+
+		if not is_matching_source:
+			raise ValueError(f'Library `{name}` must match its Python module name')
+
+		full_name         = name if is_direct_execution else module_name
+		is_name_available = full_name not in sys.modules or sys.modules[full_name] is module
+
+		if not is_name_available:
+			raise ValueError(f'Library `{full_name}` is already published')
+
+		library_class = type(type(self))(
+			self.String.snake_to_camel(name),
+			(type(self),),
+			{'__module__': module_name, '__extended__': True},
+			path    = path,
+			plugins = plugins
+		)
+
+		return library_class.__instance__
 
 	# Join relative paths without mutating the library root.
 	# ----------------------------------------------------------------------
