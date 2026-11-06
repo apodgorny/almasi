@@ -22,6 +22,11 @@ from lib.spinner   import Spinner
 from lib.tester    import Tester
 
 
+# Python calls a directly executed file '__main__', not by its filename.
+# ----------------------------------------------------------------------
+def _is_main_module(module_name):
+	return module_name == '__main__'
+
 
 class AMeta(type):
 
@@ -31,7 +36,7 @@ class AMeta(type):
 
 	# Create class
 	# ----------------------------------------------------------------------
-	def __new__(mcls, name, bases, namespace, path=None, plugins=None):
+	def __new__(mcls, name, bases, namespace, path=None, plugins=None, is_created_using_extend=False):
 		module_name  = namespace.get('__module__')
 		module       = sys.modules[module_name]
 		lib_file     = os.path.realpath(module.__file__)
@@ -42,13 +47,11 @@ class AMeta(type):
 		if not os.path.exists(path):
 			raise ValueError(f'Could not define class `{name}`. Path `{path}` does not exist')
 
-		is_extended = namespace.pop('__extended__', False)
-
 		cls = super().__new__(mcls, name, bases, namespace)
 
 		instance              = object.__new__(cls)
 		instance.__name__     = module_name
-		if is_extended and module_name == '__main__':
+		if is_created_using_extend and _is_main_module(module_name):
 			instance.__name__ = String.camel_to_snake(name)
 		instance.__spec__     = None
 		instance.__children__ = {}
@@ -80,7 +83,7 @@ class AMeta(type):
 			if plugin_cls is not None:
 				cls.__PLUGINS__[plugin_cls_name] = plugin_cls(instance)
 
-		if not is_extended:
+		if not is_created_using_extend:
 			instance.initialize()
 
 		return cls
@@ -186,7 +189,7 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 			and not keyword.iskeyword(name)
 			and name == self.String.camel_to_snake(self.String.snake_to_camel(name))
 		)
-		is_direct_execution = module_name == '__main__'
+		is_direct_execution = _is_main_module(module_name)
 		source_name         = module_name.rsplit('.', 1)[-1]
 
 		if is_direct_execution:
@@ -209,9 +212,10 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 		library_class = type(type(self))(
 			self.String.snake_to_camel(name),
 			(type(self),),
-			{'__module__': module_name, '__extended__': True},
-			path    = path,
-			plugins = plugins
+			{'__module__': module_name},
+			path                    = path,
+			plugins                 = plugins,
+			is_created_using_extend = True
 		)
 
 		return library_class.__instance__
