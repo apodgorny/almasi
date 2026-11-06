@@ -77,7 +77,7 @@ extend_child = extend_parent.extend('extend_child')
 			assert sys.modules['extend_parent'] is parent
 			assert sys.modules['extend_child'] is child
 			assert type(child).__bases__ == (type(parent),)
-			assert child.__path__ == os.path.join(child_dir, 'root')
+			assert child.__path__ == os.path.join(os.path.realpath(child_dir), 'root')
 			assert parent.api.Shared is child.api.Shared
 			assert sys.modules[type(child.api.Shared).__module__].__lib__ is parent
 

@@ -161,6 +161,20 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 		return value
 
 	# ======================================================================
+	# PRIVATE METHODS
+	# ======================================================================
+
+	# Accept canonical snake_case library names.
+	# ----------------------------------------------------------------------
+	def _is_valid_library_name(self, name):
+		return (
+			isinstance(name, str)
+			and name.isidentifier()
+			and not keyword.iskeyword(name)
+			and name == self.String.camel_to_snake(self.String.snake_to_camel(name))
+		)
+
+	# ======================================================================
 	# PUBLIC METHODS
 	# ======================================================================
 
@@ -176,40 +190,33 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 		caller      = sys._getframe(1).f_globals
 		module_name = caller['__name__']
 		module      = sys.modules[module_name]
-
-		is_valid_name = (
-			isinstance(name, str)
-			and name.isidentifier()
-			and not keyword.iskeyword(name)
-			and name == self.String.camel_to_snake(self.String.snake_to_camel(name))
-		)
+		is_main     = module_name == '__main__'
 		source_name = module_name.rsplit('.', 1)[-1]
 
-		if module_name == '__main__':
+		if is_main:
 			source_name = os.path.splitext(os.path.basename(module.__file__))[0]
 
-		is_matching_source = source_name == name
+		if self._is_valid_library_name(name):
+			full_name = name if is_main else module_name
 
-		if not is_valid_name:
+			if source_name == name:
+				is_name_available = full_name not in sys.modules or sys.modules[full_name] is module
+
+				if is_name_available:
+					library_class = type(type(self))(
+						self.String.snake_to_camel(name),
+						(type(self),),
+						{'__module__' : module_name},
+						path                    = path,
+						plugins                 = plugins,
+						is_created_using_extend = True
+					)
+				else:
+					raise ValueError(f'Library `{full_name}` is already published')
+			else:
+				raise ValueError(f'Library `{name}` must match its Python module name')
+		else:
 			raise ValueError(f'Invalid library name: `{name}`')
-
-		if not is_matching_source:
-			raise ValueError(f'Library `{name}` must match its Python module name')
-
-		full_name         = name if module_name == '__main__' else module_name
-		is_name_available = full_name not in sys.modules or sys.modules[full_name] is module
-
-		if not is_name_available:
-			raise ValueError(f'Library `{full_name}` is already published')
-
-		library_class = type(type(self))(
-			self.String.snake_to_camel(name),
-			(type(self),),
-			{'__module__': module_name},
-			path                    = path,
-			plugins                 = plugins,
-			is_created_using_extend = True
-		)
 
 		return library_class.__instance__
 
