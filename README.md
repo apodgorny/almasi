@@ -27,6 +27,14 @@ mylib = a.extend('mylib')
 
 To build a library on top of another, use `mylib = parent.extend('mylib')` in the corresponding module. The resulting library class inherits from the parent's class, and namespace lookup follows that lineage. Library creation does **not** implicitly invoke `initialize()`; the application explicitly initializes the services it needs.
 
+To identify the active application explicitly, pass `is_app=True` when extending its library (the default is `False`):
+
+```python
+web_app = web.extend('web_app', is_app=__name__ == '__main__')
+```
+
+The selected application is accessible as `a.__app__` or through inherited library attributes such as `web.__app__`. Before application selection, this value is `None`. This is a process-wide application selection, not request-local context or an automatic injection of a Python module global named `__app__`.
+
 ### Filesystem → Namespace
 
 A library's filesystem structure maps directly to its Python namespace:
