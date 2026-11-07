@@ -5,15 +5,6 @@ import importlib.util
 
 class Imports:
 
-	__loaded_modules__ = []
-
-	# Update application context in modules loaded before application selection.
-	# ----------------------------------------------------------------------
-	@classmethod
-	def set_app(cls, app):
-		for module in cls.__loaded_modules__:
-			module.__app__ = app
-
 	# Load once with the explicitly supplied library, never the last imported one.
 	# ----------------------------------------------------------------------
 	@classmethod
@@ -26,7 +17,6 @@ class Imports:
 			module = importlib.util.module_from_spec(spec)
 
 			module.__lib__   = lib
-			module.__app__   = lib.__app__
 			module.__route__ = route
 			module.__mtime__ = os.path.getmtime(path)
 			module.__dict__['UNDEFINED'] = lib.Undefined
@@ -34,7 +24,6 @@ class Imports:
 			sys.modules[path] = module
 
 			spec.loader.exec_module(module)
-			cls.__loaded_modules__.append(module)
 
 		return module
 
