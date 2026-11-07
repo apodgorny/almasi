@@ -33,7 +33,16 @@ When `extend()` is called directly from Python's `__main__` module, the resultin
 web_app = web.extend('web_app')
 ```
 
-The selected application is accessible as `a.__app__`, through inherited library attributes such as `web.__app__`, and directly as `__app__` inside Python modules loaded by Almasi's `Imports` loader. Modules loaded before application selection receive the application reference when it is selected; modules loaded afterward receive it immediately. For example, a framework service can use `__app__.services.SomeService` without passing the application through its constructors or methods. This is a process-wide application reference, not request-local context. It starts as `None`, and import-time uses that require an active application must occur after selection. Since selection follows `__main__`, a script that calls `extend()` directly is also treated as an application.
+The selected application is stored as `a.__app__`. Every Almasi `Module` instance — including `Service` and event-controller instances — inherits `self.__app__` from the `Module` base class. This property resolves the current application at access time, so objects created before application selection also see it. `self.__lib__` identifies the library that defined the class, independently of `self.__app__`. The loader does not inject an application global into Python modules.
+
+```python
+class Example(web.Module):
+
+	def execute(self):
+		return self.__app__.services.SomeService
+```
+
+Application selection is process-wide, not per request. Before selection, `self.__app__` returns `None`. Since selection follows `__main__`, a script calling `extend()` directly is also treated as an application.
 
 ### Filesystem → Namespace
 
