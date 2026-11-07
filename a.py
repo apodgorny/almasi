@@ -231,6 +231,7 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 
 		if is_main:
 			A.__app__ = library_class.__instance__
+			Imports.set_app(A.__app__)
 
 		return library_class.__instance__
 
