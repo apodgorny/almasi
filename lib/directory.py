@@ -1,3 +1,9 @@
+# ==============================================================================
+# DIRECTORY
+# ==============================================================================
+# Resolve filesystem namespaces and invalidate cached attributes on mutation.
+# ==============================================================================
+
 import os
 import stat
 import sys
@@ -141,25 +147,23 @@ class Directory(File):
 			else:
 				is_affected = route == '.' and isinstance(face, type(source_lib))
 
-			if not is_affected:
-				continue
+			if is_affected:
+				for name, child in list(face.__children__.items()):
+					is_same_file = child.get_path() == path
+					is_same_name = name == stem or source_lib.String.camel_to_snake(name) == stem
 
-			for name, child in list(face.__children__.items()):
-				is_same_file = child.get_path() == path
-				is_same_name = name == stem or source_lib.String.camel_to_snake(name) == stem
+					if is_same_file:
+						child._invalidate()
 
-				if is_same_file:
-					child._invalidate()
+					if is_same_file or is_same_name:
+						del face.__children__[name]
+						face.__dict__.pop(name, None)
+						face.__cached_names__.discard(name)
 
-				if is_same_file or is_same_name:
-					del face.__children__[name]
-					face.__dict__.pop(name, None)
-					face.__cached_names__.discard(name)
-
-			for name in tuple(face.__cached_names__):
-				if name == stem or source_lib.String.camel_to_snake(name) == stem:
-					face.__dict__.pop(name, None)
-					face.__cached_names__.discard(name)
+				for name in tuple(face.__cached_names__):
+					if name == stem or source_lib.String.camel_to_snake(name) == stem:
+						face.__dict__.pop(name, None)
+						face.__cached_names__.discard(name)
 
 	# Publish a completed temporary file; never expose a partial destination.
 	# ----------------------------------------------------------------------

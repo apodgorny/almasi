@@ -43,12 +43,12 @@ class AMeta(type):
 
 		cls = super().__new__(mcls, name, bases, namespace)
 
-		instance              = object.__new__(cls)
-		instance.__name__     = module_name
+		instance                  = object.__new__(cls)
+		instance.__name__         = module_name
 		if is_created_using_extend and module_name == '__main__':
 			instance.__name__ = String.camel_to_snake(name)
-		instance.__spec__     = None
-		instance.__children__    = {}
+		instance.__spec__         = None
+		instance.__children__     = {}
 		instance.__cached_names__ = set()
 
 		# Track live library namespaces for targeted cache invalidation.
