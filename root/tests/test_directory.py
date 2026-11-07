@@ -180,6 +180,8 @@ class TestDirectory(a.Tester):
 			if os.path.isfile(path):
 				os.unlink(path)
 			a.__children__.pop(name, None)
+			a.__dict__.pop(name, None)
+			a.__cached_names__.discard(name)
 
 
 if __name__ == '__main__':

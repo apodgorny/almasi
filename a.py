@@ -48,7 +48,11 @@ class AMeta(type):
 		if is_created_using_extend and module_name == '__main__':
 			instance.__name__ = String.camel_to_snake(name)
 		instance.__spec__     = None
-		instance.__children__ = {}
+		instance.__children__    = {}
+		instance.__cached_names__ = set()
+
+		# Track live library namespaces for targeted cache invalidation.
+		Directory.__namespace_faces__.add(instance)
 
 		Undefined.__lib__ = instance
 		Imports.__lib__   = instance
@@ -122,7 +126,10 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 		if value is None:
 			raise AttributeError(f'Library `{self.__name__}` has no attribute `{name}`')
 
-		return value.load()
+		result = value.load()
+		self.__dict__[name] = result
+		self.__cached_names__.add(name)
+		return result
 
 	# String representation
 	# ----------------------------------------------------------------------

@@ -2,6 +2,7 @@ import os
 import stat
 import sys
 import tempfile
+import weakref
 
 from functools import partial
 
@@ -10,11 +11,16 @@ from .file import File
 
 class Directory(File):
 
+	# Weak references keep namespace tracking from extending object lifetimes.
+	__namespace_faces__ = weakref.WeakSet()
+
 	# Share the existing root face cache when representing that same root.
 	# ----------------------------------------------------------------------
 	def __init__(self, lib, path, route):
 		super().__init__(lib, path, route)
-		self.__children__ = lib.__children__ if self.get_path() == os.path.realpath(lib.__path__) else {}
+		self.__children__     = lib.__children__ if self.get_path() == os.path.realpath(lib.__path__) else {}
+		self.__cached_names__ = set()
+		Directory.__namespace_faces__.add(self)
 
 	# Realize resolved children without exposing their carriers.
 	# ----------------------------------------------------------------------
@@ -24,7 +30,10 @@ class Directory(File):
 		if value is None:
 			raise AttributeError(f'Module `{self.get_route()}.{name}` does not exist or no loading method is provided')
 
-		return value.load()
+		result = value.load()
+		self.__dict__[name] = result
+		self.__cached_names__.add(name)
+		return result
 
 	# Discover visible carriers without loading their content.
 	# ----------------------------------------------------------------------
@@ -107,17 +116,50 @@ class Directory(File):
 
 		return plugin
 
-	# Refresh affected carriers and bindings while preserving unrelated content.
+	# Invalidate a changed file in every live inherited namespace face.
+	# This work runs only on mutation, never on a cached attribute lookup.
 	# ----------------------------------------------------------------------
 	def _invalidate_children(self, path):
-		stem = os.path.splitext(os.path.basename(path))[0]
+		path          = os.path.abspath(path)
+		parent_path   = os.path.dirname(path)
+		source_lib    = self.get_lib()
+		source_root   = os.path.realpath(source_lib.__path__)
+		is_under_root = os.path.commonpath([source_root, parent_path]) == source_root
+		relative      = os.path.relpath(parent_path, source_root) if is_under_root else None
+		route         = relative.replace(os.sep, '.') if relative is not None else None
+		stem          = os.path.splitext(os.path.basename(path))[0]
 
-		for name, child in list(self.__children__.items()):
-			if child.get_path() == path:
-				child._invalidate()
+		for face in tuple(Directory.__namespace_faces__):
+			if isinstance(face, Directory):
+				is_same_directory = face.get_path() == parent_path
+				is_inherited_path = (
+					route is not None
+					and isinstance(face.get_lib(), type(source_lib))
+					and face.get_route().partition('.')[2] == ('' if route == '.' else route)
+				)
+				is_affected = is_same_directory or is_inherited_path
+			else:
+				is_affected = route == '.' and isinstance(face, type(source_lib))
 
-			if child.get_path() == path or name == stem or self.get_lib().String.camel_to_snake(name) == stem:
-				del self.__children__[name]
+			if not is_affected:
+				continue
+
+			for name, child in list(face.__children__.items()):
+				is_same_file = child.get_path() == path
+				is_same_name = name == stem or source_lib.String.camel_to_snake(name) == stem
+
+				if is_same_file:
+					child._invalidate()
+
+				if is_same_file or is_same_name:
+					del face.__children__[name]
+					face.__dict__.pop(name, None)
+					face.__cached_names__.discard(name)
+
+			for name in tuple(face.__cached_names__):
+				if name == stem or source_lib.String.camel_to_snake(name) == stem:
+					face.__dict__.pop(name, None)
+					face.__cached_names__.discard(name)
 
 	# Publish a completed temporary file; never expose a partial destination.
 	# ----------------------------------------------------------------------
@@ -196,7 +238,12 @@ class Directory(File):
 			if os.path.islink(path):
 				raise ValueError(f'Symbolic link is not allowed: {path}')
 
+			is_existing_directory = os.path.isdir(path)
 			os.makedirs(path, exist_ok=True)
+
+			if not is_existing_directory:
+				directory._invalidate_children(path)
+
 			child = directory.__children__.get(name)
 			if child is not None and child.get_path() != path:
 				directory._invalidate_children(path)

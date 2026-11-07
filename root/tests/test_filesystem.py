@@ -381,6 +381,75 @@ class TestFilesystem(a.Tester):
 			assert child.root == 'local root'
 			assert parent.root == 'inherited root'
 
+	# Repeated namespace lookups use Python's own attribute cache.
+	# Replacing a file clears that cache but keeps unrelated values intact.
+	# ----------------------------------------------------------------------
+	@classmethod
+	def test_namespace_attribute_cache(cls):
+		with tempfile.TemporaryDirectory() as root, patch.dict(sys.modules):
+			library = cls._library('filesystem_cache', root, a.A)
+			library.write('notes.json', {'version': 1})
+			library.write('other.json', {'stable': True})
+
+			first  = library.notes
+			stable = library.other
+			assert library.__dict__['notes'] is first
+
+			library.write('notes.json', {'version': 2})
+			assert 'notes' not in library.__dict__
+			assert library.notes == {'version': 2}
+			assert library.other is stable
+
+			directory = library.mkdir('services')
+			directory.write('entities.json', {'version': 1})
+			assert library.services is directory
+			assert directory.entities == {'version': 1}
+			assert directory.__dict__['entities'] == {'version': 1}
+
+			directory.write('entities.json', {'version': 2})
+			assert 'entities' not in directory.__dict__
+			assert library.services.entities == {'version': 2}
+
+	# A parent mutation must also refresh a child's previously resolved path.
+	# ----------------------------------------------------------------------
+	@classmethod
+	def test_inherited_namespace_cache_invalidation(cls):
+		with tempfile.TemporaryDirectory() as parent_root, tempfile.TemporaryDirectory() as child_root, patch.dict(sys.modules):
+			parent = cls._library('cache_parent', parent_root, a.A)
+			child  = cls._library('cache_child', child_root, type(parent))
+
+			parent.write('notes.json', {'value': 1})
+			parent.mkdir('services').write('entities.json', {'value': 1})
+
+			assert child.notes == {'value': 1}
+			assert child.services.entities == {'value': 1}
+
+			parent.write('notes.json', {'value': 2})
+			parent.services.write('entities.json', {'value': 2})
+
+			assert child.notes == {'value': 2}
+			assert child.services.entities == {'value': 2}
+
+			# Creating a local directory replaces an already cached inherited one.
+			child.mkdir('services').write('entities.json', {'local': True})
+			assert child.services.entities == {'local': True}
+			assert parent.services.entities == {'value': 2}
+
+	# Changing a symlink mount invalidates the previously cached directory face.
+	# ----------------------------------------------------------------------
+	@classmethod
+	def test_link_invalidates_namespace_cache(cls):
+		with tempfile.TemporaryDirectory() as root, tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+			directory = a.Directory(a, root, 'a.mounts')
+
+			directory.link('mounted', first)
+			first_face = directory.mounted
+			assert first_face.get_path() == os.path.realpath(first)
+
+			directory.link('mounted', second)
+			assert directory.mounted.get_path() == os.path.realpath(second)
+			assert directory.mounted is not first_face
+
 	# Invalidate retained JSON carriers after byte copying without serialization.
 	# ----------------------------------------------------------------------
 	@classmethod
