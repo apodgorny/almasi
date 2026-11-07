@@ -175,6 +175,11 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	# PRIVATE METHODS
 	# ======================================================================
 
+	# Check whether extend() was called from the Python entry module.
+	# ----------------------------------------------------------------------
+	def _is_main(self):
+		return sys._getframe(2).f_globals['__name__'] == '__main__'
+
 	# Accept canonical snake_case library names.
 	# ----------------------------------------------------------------------
 	def _is_valid_library_name(self, name):
@@ -192,11 +197,11 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	# Extend the namespace through an explicit, canonical library name.
 	# Initialization belongs to the caller after extend() returns.
 	# ----------------------------------------------------------------------
-	def extend(self, name, path='root', plugins=None, is_app=False):
+	def extend(self, name, path='root', plugins=None):
 		caller      = sys._getframe(1).f_globals
 		module_name = caller['__name__']
 		module      = sys.modules[module_name]
-		is_main     = module_name == '__main__'
+		is_main     = self._is_main()
 		source_name = module_name.rsplit('.', 1)[-1]
 
 		if is_main:
@@ -224,7 +229,7 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 		else:
 			raise ValueError(f'Invalid library name: `{name}`')
 
-		if is_app:
+		if is_main:
 			A.__app__ = library_class.__instance__
 
 		return library_class.__instance__
