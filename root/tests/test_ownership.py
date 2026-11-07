@@ -27,14 +27,17 @@ class TestOwnership(a.Tester):
 	# ----------------------------------------------------------------------
 	@staticmethod
 	def _library(name, root, ancestor):
-		path              = os.path.join(root, name)
-		module            = types.ModuleType(name)
-		module.__file__   = path + '.py'
-		sys.modules[name] = module
+		path               = os.path.join(root, name)
+		module             = types.ModuleType(name)
+		module.__file__    = path + '.py'
+		module.parent      = ancestor.__instance__
+		sys.modules[name]  = module
 
 		os.makedirs(path)
-		library = type(a.A)(name.title(), (ancestor,), {'__module__': name}, path=path)
-		return library.__instance__
+		# Execute in the owning module so extend() sees its canonical name.
+		# ----------------------------------------------------------------------
+		exec(f'{name} = parent.extend({name!r}, path={path!r})', module.__dict__)
+		return module.__dict__[name]
 
 	# Restore the process globals after exercising real library creation.
 	# ----------------------------------------------------------------------

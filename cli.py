@@ -6,22 +6,20 @@ import importlib.util
 
 
 def get_parent_lib(name):
-	spec = importlib.util.find_spec(name)
-	if spec is None or spec.origin is None or not os.path.isfile(spec.origin):
-		return None
-	with open(spec.origin) as file:
-		tree = ast.parse(file.read())
-	for node in tree.body:
-		if not isinstance(node, ast.ClassDef):
-			continue
-		if not node.bases:
-			continue
-		base = node.bases[0]
-		if isinstance(base, ast.Attribute) and isinstance(base.value, ast.Name):
-			return base.value.id
-		if isinstance(base, ast.Name):
-			return base.id
-	return None
+	result = None
+	spec   = importlib.util.find_spec(name)
+
+	if spec is not None and spec.origin is not None and os.path.isfile(spec.origin):
+		with open(spec.origin) as file:
+			tree = ast.parse(file.read())
+
+		for node in tree.body:
+			if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+				call = node.value.func
+				if isinstance(call, ast.Attribute) and call.attr == 'extend' and isinstance(call.value, ast.Name):
+					result = call.value.id
+					break
+	return result
 
 
 def get_lib_chain(name, lib):
@@ -34,30 +32,15 @@ def get_lib_chain(name, lib):
 	return chain
 
 
-def to_class_name(name):
-	return ''.join(part.capitalize() for part in name.split('_'))
-
-
 def create_root(path):
 	os.makedirs(os.path.join(path, 'root'))
 
 
-def create_module(path, name, kind, lib):
-	class_name = to_class_name(name)
-
-	if lib == 'a':
-		import_line = 'import a'
-		base = 'a.A' if kind == 'Lib' else 'a.A'
-	else:
-		import_line = f'import {lib}'
-		base = f'{lib}.{to_class_name(lib)}'
-
+# Generate canonical library declarations without legacy class constructors.
+# ----------------------------------------------------------------------
+def create_module(path, name, lib):
 	with open(os.path.join(path, f'{name}.py'), 'w') as file:
-		file.write(
-			f'{import_line}\n\n'
-			f"class {class_name}({base}, path='root'):\n"
-			'\tpass\n'
-		)
+		file.write(f'import {lib}\n\n\n{name} = {lib}.extend({name!r})\n')
 
 
 def create_demo_class(path, name, lib):
@@ -123,7 +106,7 @@ def create(name, kind, lib='a'):
 
 	os.makedirs(path)
 	create_root(path)
-	create_module(path, name, kind, lib)
+	create_module(path, name, lib)
 	create_demo_class(path, name, lib)
 	create_main(path, name, lib)
 

@@ -14,21 +14,18 @@ The result is a development model where **the structure of the codebase becomes 
 
 ### Library = Class
 
-An Almasi library is a Python class.
+An Almasi library is backed by a Python class and a canonical published instance, but is declared with `extend()` rather than a class definition.
 
-Libraries can therefore be extended through ordinary Python inheritance:
+In `mylib.py`:
 
 ```python
 import a
 
 
-class MyLib(a.A, path='/path/to/mylib/root'):
-
-	def initialize(self):
-		pass
+mylib = a.extend('mylib')
 ```
 
-Building a library on top of another library becomes native class inheritance.
+To build a library on top of another, use `mylib = parent.extend('mylib')` in the corresponding module. The resulting library class inherits from the parent's class, and namespace lookup follows that lineage. Library creation does **not** implicitly invoke `initialize()`; the application explicitly initializes the services it needs.
 
 ### Filesystem → Namespace
 

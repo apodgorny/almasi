@@ -13,6 +13,7 @@ import tempfile
 import a
 
 from contextlib    import contextmanager
+from unittest      import TestCase
 from unittest.mock import patch
 
 
@@ -81,28 +82,19 @@ extend_child = extend_parent.extend('extend_child')
 			assert parent.api.Shared is child.api.Shared
 			assert sys.modules[type(child.api.Shared).__module__].__lib__ is parent
 
-	# Do not invoke an inherited initializer a second time.
+	# Reject legacy class declarations; library creation is explicit.
 	# ----------------------------------------------------------------------
 	@classmethod
-	def test_extend_skips_inherited_initialize(cls):
+	def test_extend_rejects_class_declaration(cls):
 		with cls._runtime() as root:
-			parent_dir = cls._source(root, 'extend_legacy', '''import a
+			directory = cls._source(root, 'extend_legacy', '''import a
 
 class ExtendLegacy(a.A):
-\tdef initialize(self):
-\t\tself.ready = True
+\tpass
 ''')
-			child_dir  = cls._source(root, 'extend_child', '''import extend_legacy
-
-extend_child = extend_legacy.extend('extend_child')
-''')
-			sys.path[:0] = [child_dir, parent_dir]
-			child  = importlib.import_module('extend_child')
-			parent = importlib.import_module('extend_legacy')
-
-			assert parent.ready is True
-			assert 'ready' not in child.__dict__
-			assert type(child).__bases__ == (type(parent),)
+			sys.path.insert(0, directory)
+			with TestCase().assertRaisesRegex(TypeError, 'a.extend'):
+				importlib.import_module('extend_legacy')
 
 	# Keep __main__ intact and run entry-point code only for direct execution.
 	# ----------------------------------------------------------------------

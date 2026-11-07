@@ -26,17 +26,21 @@ class TestFilesystem(a.Tester):
 	# ----------------------------------------------------------------------
 	@classmethod
 	def _library(cls, name, root, ancestor):
-		module            = types.ModuleType(name)
-		module.__file__   = root + '.py'
-		sys.modules[name] = module
+		module             = types.ModuleType(name)
+		module.__file__    = root + '.py'
+		module.parent      = ancestor.__instance__
+		sys.modules[name]  = module
 
 		state = a.Imports.__lib__, a.Tester.__lib__, a.Undefined.__lib__
 		try:
-			library = type(a.A)(name.title(), (ancestor,), {'__module__': name}, path=root)
+			# Execute in the owning module so extend() sees its canonical name.
+			# ----------------------------------------------------------------------
+			exec(f'{name} = parent.extend({name!r}, path={root!r})', module.__dict__)
+			library = module.__dict__[name]
 		finally:
 			a.Imports.__lib__, a.Tester.__lib__, a.Undefined.__lib__ = state
 
-		return library.__instance__
+		return library
 
 	# Fail after a writer has already produced partial temporary content.
 	# ----------------------------------------------------------------------

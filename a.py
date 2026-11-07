@@ -38,6 +38,11 @@ class AMeta(type):
 		path         = os.path.abspath(os.path.join(lib_path, path or 'root'))  # Relative or absolute path is accepted
 		plugins_path = os.path.join(lib_path, 'plugins')
 
+		# Only the bootstrap A class may be declared directly.
+		# ----------------------------------------------------------------------
+		if not is_created_using_extend and (name != 'A' or module_name != 'a'):
+			raise TypeError('Declare libraries with a.extend(), not a class declaration')
+
 		if not os.path.exists(path):
 			raise ValueError(f'Could not define class `{name}`. Path `{path}` does not exist')
 
@@ -80,9 +85,6 @@ class AMeta(type):
 			plugin_cls   = Imports.get_class(instance, plugin_cls_name, plugins_path, plugin_route)
 			if plugin_cls is not None:
 				cls.__PLUGINS__[plugin_cls_name] = plugin_cls(instance)
-
-		if not is_created_using_extend:
-			instance.initialize()
 
 		return cls
 
@@ -184,11 +186,6 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	# ======================================================================
 	# PUBLIC METHODS
 	# ======================================================================
-
-	# Called when library is fully assembled and ready to work
-	# ----------------------------------------------------------------------
-	def initialize(self):
-		pass
 
 	# Extend the namespace through an explicit, canonical library name.
 	# Initialization belongs to the caller after extend() returns.
