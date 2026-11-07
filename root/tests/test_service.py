@@ -43,8 +43,9 @@ class TestService(a.Tester):
 
 			shutil.rmtree(path)
 
-		if 'tests_runtime' in a.__children__:
-			del a.__children__['tests_runtime']
+		a.__children__.pop('tests_runtime', None)
+		a.__dict__.pop('tests_runtime', None)
+		a.__cached_names__.discard('tests_runtime')
 
 	# ======================================================================
 	# PUBLIC METHODS
