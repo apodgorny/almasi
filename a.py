@@ -103,6 +103,8 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	Timer         = Timer
 	Spinner       = Spinner
 
+	__app__       = None
+
 	dual_method   = DualMethod
 	dual_property = DualProperty
 
@@ -190,7 +192,7 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	# Extend the namespace through an explicit, canonical library name.
 	# Initialization belongs to the caller after extend() returns.
 	# ----------------------------------------------------------------------
-	def extend(self, name, path='root', plugins=None):
+	def extend(self, name, path='root', plugins=None, is_app=False):
 		caller      = sys._getframe(1).f_globals
 		module_name = caller['__name__']
 		module      = sys.modules[module_name]
@@ -221,6 +223,9 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 				raise ValueError(f'Library `{name}` must match its Python module name')
 		else:
 			raise ValueError(f'Invalid library name: `{name}`')
+
+		if is_app:
+			A.__app__ = library_class.__instance__
 
 		return library_class.__instance__
 
