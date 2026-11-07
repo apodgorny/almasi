@@ -140,17 +140,6 @@ Atomic writes and copies publish completed hidden temporary files with `os.repla
 
 See [the current filesystem invariants](docs/almasi_invariants8.md) for identity, reserved names, inheritance and cache scope.
 
-## CLI
-
-Almasi includes a CLI for creating libraries and applications:
-
-```bash
-almasi lib my_lib a
-almasi app my_app my_lib
-```
-
-The CLI scaffolds the filesystem structure and establishes the library inheritance chain automatically.
-
 ## Installation
 
 Clone the repository and run the included installer:
