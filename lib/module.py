@@ -58,6 +58,8 @@ class ModuleMeta(type):
 	# ----------------------------------------------------------------------
 	def __new__(mcls, name, bases, namespace, **kwargs):
 		namespace['__has_own_module__'] = mcls.has_own_module(namespace)
+		if mcls.module_lib(namespace) is not None:
+			namespace['__lib__'] = mcls.module_lib(namespace)
 
 		if namespace['__has_own_module__']:
 			namespace['__route__'] = mcls.module_route(namespace)
@@ -80,6 +82,13 @@ class ModuleMeta(type):
 class Module(metaclass=ModuleMeta):
 
 	_instance_counter = 0
+
+	# Read the currently selected application without binding it at import time.
+	# ----------------------------------------------------------------------
+	@property
+	def __app__(self):
+		import a
+		return a.__app__
 
 	# Using new to avoid having to call super().__init__() everywhere
 	# ----------------------------------------------------------------------
