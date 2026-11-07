@@ -1,6 +1,8 @@
 import asyncio
 import time
 
+from unittest.mock import patch
+
 import a
 from lib.events import Events
 from lib.function import Function
@@ -131,6 +133,24 @@ class TestCore(a.Tester):
 		assert result == 5
 		assert Function(run).is_async() == True
 
+	# Account for recursively nested calls sharing a timer name.
+	# ----------------------------------------------------------------------
+	@classmethod
+	def test_timer_nested_same_name(cls):
+		a.Timer.reset()
+
+		with patch('lib.timer.time.perf_counter', side_effect=[1.0, 2.0, 3.0, 4.0]):
+			a.Timer.start('nested')
+			a.Timer.start('nested')
+			a.Timer.stop('nested')
+			a.Timer.stop('nested')
+
+		assert a.Timer._times['nested'] == [1.0, 3.0]
+		assert a.Timer._start['nested'] == []
+
+		a.Timer.reset()
+
+	# Accumulate distinct intervals and reset measurements.
 	# ----------------------------------------------------------------------
 	@classmethod
 	def test_timer_accumulates_and_resets(cls):

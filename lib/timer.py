@@ -1,34 +1,8 @@
-# ======================================================================
-# Usage examples
-# ======================================================================
-#
-# Timer.start('load')
-# ...
-# Timer.stop()
-# Timer.report()
-#
-# Timer.start('query')
-# ...
-# Timer.stop(report=True)
-#
-# Timer.start('parse')
-# ...
-# Timer.stop()
-# print(Timer.get_time('parse'))
-#
-# Timer.start('a')
-# ...
-# Timer.stop()
-# Timer.start('a')
-# ...
-# Timer.stop()
-# Timer.report(name='a')
-#
-# ======================================================================
-
-# ======================================================================
-# Time measurement module with named accumulators and summary reporting.
-# ======================================================================
+# ==============================================================================
+# TIMER
+# ==============================================================================
+# Accumulate measured durations, including recursively nested calls.
+# ==============================================================================
 
 import time
 from collections import defaultdict
@@ -48,7 +22,7 @@ class Timer:
 	def _init(cls):
 		if not cls.is_initialized:
 			cls._times = defaultdict(list)
-			cls._start = defaultdict(lambda: False)
+			cls._start = defaultdict(list)
 			cls.is_initialized = True
 
 	# Format duration
@@ -119,7 +93,7 @@ class Timer:
 	def start(cls, name):
 		if cls.enabled:
 			cls._init()
-			cls._start[name] = time.perf_counter()
+			cls._start[name].append(time.perf_counter())
 			cls.last_timer   = name
 		return cls
 
@@ -133,10 +107,10 @@ class Timer:
 
 			if name is not None:
 				if cls._start[name]:
-					cls._times[name].append(time.perf_counter() - cls._start[name])
+					start = cls._start[name].pop()
+					cls._times[name].append(time.perf_counter() - start)
 
-				cls._start[name] = False
-				cls.last_timer   = name
+				cls.last_timer = name
 
 				if report:
 					cls.report_one(name)
@@ -148,7 +122,7 @@ class Timer:
 	@classmethod
 	def reset(cls):
 		cls._times = defaultdict(list)
-		cls._start = defaultdict(lambda: False)
+		cls._start = defaultdict(list)
 		cls.last_timer = None
 		cls.is_initialized = True
 		return cls
