@@ -1,3 +1,5 @@
+import gc
+import os
 import sys
 
 from .function import Function
@@ -99,6 +101,64 @@ class Module(metaclass=ModuleMeta):
 		self.__instance_id__ = Module._instance_counter
 
 		return self
+
+	# Replace source-backed behavior while keeping live object identity and state.
+	# Invoke at a quiescent execution boundary; in-flight methods are not tracked.
+	# ----------------------------------------------------------------------
+	@classmethod
+	def __reload__(cls):
+		is_source = cls.__dict__.get('__has_own_module__', False)
+
+		if is_source and type(cls) is ModuleMeta:
+			path   = os.path.realpath(cls.__module__)
+			module = sys.modules.get(path)
+
+			if module is not None and module.__dict__.get(cls.__name__) is cls:
+				fresh = cls.__lib__.Imports.prepare_module(cls.__lib__, path, cls.__route__)
+				new   = fresh.__dict__.get(cls.__name__)
+
+				if type(new) is ModuleMeta and new.__bases__ == cls.__bases__:
+					instances   = [item for item in gc.get_objects() if type(item) is cls]
+					descendants = [child for child in cls.__subclasses__() if type(child) is ModuleMeta]
+					switched    = []
+					rebased     = []
+
+					try:
+						for instance in instances:
+							instance.__class__ = new
+							switched.append(instance)
+
+						# Existing children retain their class identity and super() chain.
+						# --------------------------------------------------------------
+						for child in descendants:
+							bases = child.__bases__
+							child.__bases__ = tuple(new if base is cls else base for base in bases)
+							rebased.append((child, bases))
+					except Exception:
+						for child, bases in reversed(rebased):
+							child.__bases__ = bases
+
+						for instance in switched:
+							instance.__class__ = cls
+
+						raise
+
+					sys.modules[path] = fresh
+					directory = cls.__lib__.Directory(
+						cls.__lib__,
+						os.path.dirname(path),
+						cls.__route__.rsplit('.', 1)[0]
+					)
+					directory.invalidate(os.path.basename(path))
+					result = new
+				else:
+					raise TypeError(f'Incompatible replacement class: {cls.__route__}')
+			else:
+				raise RuntimeError(f'Source module is not current: {cls.__route__}')
+		else:
+			raise TypeError(f'Hot reload requires a source-backed a.Module: {cls.__name__}')
+
+		return result
 
 	# Intercept method access to inject event hooks
 	# ----------------------------------------------------------------------

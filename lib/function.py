@@ -44,11 +44,30 @@ class Function:
 			self.owner = None
 			self.func  = callee
 
+	# Invoke the current method of a live module instance after code replacement.
+	# ----------------------------------------------------------------------
+	def _callee(self):
+		from .module import Module
+
+		callee = self.func
+
+		if isinstance(self.owner, Module):
+			callee = getattr(self.owner, self.func.__name__)
+
+		return callee
+
 	# Call underlying function (sync or async)
 	# ----------------------------------------------------------------------
 	def __call__(self, *args, **kwargs):
-		if self.owner is not None : result = self.func(self.owner, *args, **kwargs)
-		else                      : result = self.func(*args, **kwargs)
+		if self.owner is not None:
+			from .module import Module
+
+			if isinstance(self.owner, Module):
+				result = self._callee()(*args, **kwargs)
+			else:
+				result = self.func(self.owner, *args, **kwargs)
+		else:
+			result = self.func(*args, **kwargs)
 
 		# async path: return awaitable transparently
 		if hasattr(result, '__await__'):
@@ -73,10 +92,17 @@ class Function:
 	def __eq__(self, other):
 		if not isinstance(other, Function):
 			return False
-		return (
-			self.owner is other.owner and
-			self.func  is other.func
-		)
+		from .module import Module
+
+		if isinstance(self.owner, Module) and self.owner is other.owner:
+			result = (
+				self.func.__module__ == other.func.__module__
+				and self._func_id() == other._func_id()
+			)
+		else:
+			result = self.owner is other.owner and self.func is other.func
+
+		return result
 
 	# Human-readable representation for debugging and logs
 	# ----------------------------------------------------------------------

@@ -48,6 +48,17 @@ class Service(Module):
 
 		return result
 
+	# Keep the initialized singleton and its instance-owned initializer.
+	# ----------------------------------------------------------------------
+	def __reload__(self):
+		fresh = super().__reload__()
+
+		fresh.__instance__ = self
+		self.__dict__['_initialize'] = getattr(fresh, 'initialize', None)
+		self.__dict__['initialize']  = types.MethodType(fresh._initialize, self)
+
+		return self
+
 	# ======================================================================
 	# PRIVATE METHODS
 	# ======================================================================

@@ -27,6 +27,34 @@ class Imports:
 
 		return module
 
+	# Stage fresh source without changing the published Python module.
+	# Read the source directly so unchanged file timestamps cannot reuse bytecode.
+	# ----------------------------------------------------------------------
+	@classmethod
+	def prepare_module(cls, lib, path, route):
+		path     = os.path.realpath(path)
+		previous = sys.modules.get(path)
+		spec     = importlib.util.spec_from_file_location(path, path)
+		module   = importlib.util.module_from_spec(spec)
+
+		module.__lib__   = lib
+		module.__route__ = route
+		module.__mtime__ = os.path.getmtime(path)
+		module.__dict__['UNDEFINED'] = lib.Undefined
+
+		sys.modules[path] = module
+
+		try:
+			with open(path, 'rb') as source:
+				exec(compile(source.read(), path, 'exec'), module.__dict__)
+		finally:
+			if previous is not None:
+				sys.modules[path] = previous
+			else:
+				sys.modules.pop(path, None)
+
+		return module
+
 	# Get class
 	# ----------------------------------------------------------------------
 	@classmethod

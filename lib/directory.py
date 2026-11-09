@@ -258,6 +258,12 @@ class Directory(File):
 
 		return directory
 
+	# Explicitly refresh cached names after an external filesystem change.
+	# ----------------------------------------------------------------------
+	def invalidate(self, name):
+		path = self._destination(name)
+		self._invalidate_children(path)
+
 	# Read one exact filename through its registered format plugin.
 	# ----------------------------------------------------------------------
 	def read(self, name):
