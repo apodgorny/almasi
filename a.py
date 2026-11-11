@@ -30,19 +30,19 @@ class AMeta(type):
 	# FRAMEWORK METHODS
 	# ======================================================================
 
-	# Create class
+	# Create a library class from an absolute or source-relative path.
 	# ----------------------------------------------------------------------
 	def __new__(mcls, name, bases, namespace, path=None, plugins=None, is_created_using_extend=False):
 		module_name  = namespace.get('__module__')
 		module       = sys.modules[module_name]
 		lib_file     = os.path.realpath(module.__file__)
 		lib_path     = os.path.dirname(lib_file)
-		path         = os.path.abspath(os.path.join(lib_path, path or 'root'))  # Relative or absolute path is accepted
+		path         = os.path.abspath(os.path.join(lib_path, path or 'root'))
 		plugins_path = os.path.join(lib_path, 'plugins')
 
 		# Only the bootstrap A class may be declared directly.
 		# ----------------------------------------------------------------------
-		if not is_created_using_extend and (name != 'A' or module_name != 'a'):
+		if not is_created_using_extend and (name, module_name) != ('A', 'a'):
 			raise TypeError('Declare libraries with a.extend(), not a class declaration')
 
 		if not os.path.exists(path):
@@ -65,7 +65,7 @@ class AMeta(type):
 		Undefined.__lib__ = instance
 		Imports.__lib__   = instance
 		Tester.__lib__    = instance
-		
+
 		# Publish library name for import
 		module.__dict__[instance.__name__] = instance
 		sys.modules[instance.__name__]     = instance
@@ -124,12 +124,13 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 		for instance in self.__instances__():
 			owner = self if is_fork else instance
 			value = owner.__children__.get(name)
-			if value is not None:
-				break
 
-			value = owner.__resolve__(name, instance.__path__, self.__name__, source_lib=owner)
+			if value is None:
+				value = owner.__resolve__(name, instance.__path__, self.__name__, source_lib=owner)
+				if value is not None:
+					owner.__children__[name] = value
+
 			if value is not None:
-				owner.__children__[name] = value
 				break
 
 		if value is None:
@@ -156,17 +157,12 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	def __iter__(self):
 		return Directory(self, self.__path__, self.__name__).__iter__()
 
-	# Iterate lineage layers
+	# Iterate from this library through its inherited layers.
 	# ----------------------------------------------------------------------
 	def __instances__(self):
-		for cls in type(self).__mro__:
-			if cls is not object:
-				instance = cls.__instance__
-
-				if cls is type(self) and self._is_fork():
-					instance = self
-
-				yield instance
+		yield self
+		for cls in type(self).__mro__[1:-1]:
+			yield cls.__instance__
 
 	# Resolve using the existing plugin order.
 	# source_lib owns the file; the selected plugin may belong to another library.
@@ -199,7 +195,11 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	# Copy only ordinary configuration, not realized components or functions.
 	# ----------------------------------------------------------------------
 	def _is_fork_setting(self, name, value):
-		return not name.startswith('_') and name not in self.__cached_names__ and not callable(value)
+		return (
+			not name.startswith('_')
+			and name not in self.__cached_names__
+			and not callable(value)
+		)
 
 	# Recognize the library imports that must stay within this fork.
 	# ----------------------------------------------------------------------
@@ -211,12 +211,10 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	def _fork_import(self, name, globals=None, locals=None, fromlist=(), level=0):
 		if self._is_fork_import(name, level):
 			result = self
-			parts  = name.split('.')[1:]
-
-			for part in parts:
+			for part in name.split('.')[1:]:
 				result = getattr(result, part)
 
-			if parts and not fromlist:
+			if not fromlist:
 				result = self
 		else:
 			result = builtins.__import__(name, globals, locals, fromlist, level)
@@ -226,7 +224,7 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	# Validate simple fork names without reserving filesystem routes.
 	# ----------------------------------------------------------------------
 	def _is_valid_fork_name(self, name):
-		return isinstance(name, str) and bool(name) and name != 'default'
+		return isinstance(name, str) and name not in ('', 'default')
 
 	# Check whether extend() was called from the Python entry module.
 	# ----------------------------------------------------------------------
@@ -260,27 +258,26 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 		if is_main:
 			source_name = os.path.splitext(os.path.basename(module.__file__))[0]
 
-		if self._is_valid_library_name(name):
-			full_name = name if is_main else module_name
-
-			if source_name == name:
-				is_name_available = full_name not in sys.modules or sys.modules[full_name] is module
-
-				if is_name_available:
-					library_class = type(type(self))(
-						self.String.snake_to_camel(name),
-						(type(self),),
-						{'__module__' : module_name},
-						path                    = path,
-						plugins                 = plugins,
-						is_created_using_extend = True
-					)
-				else:
-					raise ValueError(f'Library `{full_name}` is already published')
-			else:
-				raise ValueError(f'Library `{name}` must match its Python module name')
-		else:
+		if not self._is_valid_library_name(name):
 			raise ValueError(f'Invalid library name: `{name}`')
+
+		if source_name != name:
+			raise ValueError(f'Library `{name}` must match its Python module name')
+
+		full_name         = name if is_main else module_name
+		is_name_available = full_name not in sys.modules or sys.modules[full_name] is module
+
+		if not is_name_available:
+			raise ValueError(f'Library `{full_name}` is already published')
+
+		library_class = type(type(self))(
+			self.String.snake_to_camel(name),
+			(type(self),),
+			{'__module__' : module_name},
+			path                    = path,
+			plugins                 = plugins,
+			is_created_using_extend = True
+		)
 
 		if is_main:
 			A.__app__ = library_class.__instance__
@@ -309,17 +306,18 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 		fork.__spec__         = None
 		fork.__fork_source__  = self
 		fork.__fork_name__    = name
+
 		fork.__forks__        = {}
 		fork.__children__     = {}
 		fork.__cached_names__ = set()
-		fork.__PLUGINS__      = {key: type(plugin)(fork) for key, plugin in type(self).__PLUGINS__.items()}
+		fork.__PLUGINS__      = {key: type(plugin)(fork) for key, plugin in self.__PLUGINS__.items()}
 
 		# Localize imports of this library and inherited libraries at load time.
 		# Other Python imports retain their ordinary process-wide meaning.
 		# ----------------------------------------------------------------------
 		fork.__fork_import_names__ = {
 			instance.__name__ for instance in fork.__instances__()
-			if instance.__name__ != 'a' or fork.__name__ == 'a'
+			if instance is not A.__instance__
 		}
 
 		fork.__fork_builtins__ = builtins.__dict__.copy()
