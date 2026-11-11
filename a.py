@@ -118,10 +118,11 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	# Resolve attribute
 	# ----------------------------------------------------------------------
 	def __getattr__(self, name):
-		value = None
+		value   = None
+		is_fork = self._is_fork()
 
 		for instance in self.__instances__():
-			owner = self if self.__dict__.get('__fork_source__') is not None else instance
+			owner = self if is_fork else instance
 			value = owner.__children__.get(name)
 			if value is not None:
 				break
@@ -159,8 +160,12 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	# ----------------------------------------------------------------------
 	def __instances__(self):
 		for cls in type(self).__mro__:
-			if cls != object:
-				instance = self if cls is type(self) and self.__dict__.get('__fork_source__') is not None else cls.__instance__
+			if cls is not object:
+				instance = cls.__instance__
+
+				if cls is type(self) and self._is_fork():
+					instance = self
+
 				yield instance
 
 	# Resolve using the existing plugin order.
@@ -185,6 +190,43 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	# ======================================================================
 	# PRIVATE METHODS
 	# ======================================================================
+
+	# Distinguish a detached runtime fork from the canonical library face.
+	# ----------------------------------------------------------------------
+	def _is_fork(self):
+		return '__fork_source__' in self.__dict__
+
+	# Copy only ordinary configuration, not realized components or functions.
+	# ----------------------------------------------------------------------
+	def _is_fork_setting(self, name, value):
+		return not name.startswith('_') and name not in self.__cached_names__ and not callable(value)
+
+	# Recognize the library imports that must stay within this fork.
+	# ----------------------------------------------------------------------
+	def _is_fork_import(self, name, level):
+		return level == 0 and name.partition('.')[0] in self.__fork_import_names__
+
+	# Resolve imports within this fork's module globals, preserving normal imports.
+	# ----------------------------------------------------------------------
+	def _fork_import(self, name, globals=None, locals=None, fromlist=(), level=0):
+		if self._is_fork_import(name, level):
+			result = self
+			parts  = name.split('.')[1:]
+
+			for part in parts:
+				result = getattr(result, part)
+
+			if parts and not fromlist:
+				result = self
+		else:
+			result = builtins.__import__(name, globals, locals, fromlist, level)
+
+		return result
+
+	# Validate simple fork names without reserving filesystem routes.
+	# ----------------------------------------------------------------------
+	def _is_valid_fork_name(self, name):
+		return isinstance(name, str) and bool(name) and name != 'default'
 
 	# Check whether extend() was called from the Python entry module.
 	# ----------------------------------------------------------------------
@@ -249,7 +291,7 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	# Source files and compiled code are shared; loaded classes and state are not.
 	# ----------------------------------------------------------------------
 	def fork(self, name):
-		if not isinstance(name, str) or not name or name == 'default':
+		if not self._is_valid_fork_name(name):
 			raise ValueError(f'Invalid fork name: {name}')
 
 		if name in self.__forks__:
@@ -260,7 +302,7 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 		# Copy ordinary configuration without carrying resolved classes or services.
 		# ----------------------------------------------------------------------
 		for key, value in self.__dict__.items():
-			if not key.startswith('_') and key not in self.__cached_names__ and not callable(value):
+			if self._is_fork_setting(key, value):
 				fork.__dict__[key] = copy.deepcopy(value)
 
 		fork.__name__         = self.__name__
@@ -280,30 +322,8 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 			if instance.__name__ != 'a' or fork.__name__ == 'a'
 		}
 
-		def fork_import(module, globals=None, locals=None, fromlist=(), level=0):
-			result = None
-
-			if level == 0:
-				for library_name in fork.__fork_import_names__:
-					if module == library_name or module.startswith(library_name + '.'):
-						result = fork
-
-						if module != library_name:
-							for part in module[len(library_name) + 1:].split('.'):
-								result = getattr(result, part)
-
-							if not fromlist:
-								result = fork
-
-						break
-
-			if result is None:
-				result = builtins.__import__(module, globals, locals, fromlist, level)
-
-			return result
-
 		fork.__fork_builtins__ = builtins.__dict__.copy()
-		fork.__fork_builtins__['__import__'] = fork_import
+		fork.__fork_builtins__['__import__'] = fork._fork_import
 
 		Directory.__namespace_faces__.add(fork)
 		self.__forks__[name] = fork
