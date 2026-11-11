@@ -110,8 +110,9 @@ class Module(metaclass=ModuleMeta):
 		is_source = cls.__dict__.get('__has_own_module__', False)
 
 		if is_source and type(cls) is ModuleMeta:
-			path   = os.path.realpath(cls.__module__)
-			module = sys.modules.get(path)
+			key    = cls.__module__
+			module = sys.modules.get(key)
+			path   = os.path.realpath(module.__file__) if module is not None else os.path.realpath(key)
 
 			if module is not None and module.__dict__.get(cls.__name__) is cls:
 				fresh = cls.__lib__.Imports.prepare_module(cls.__lib__, path, cls.__route__)
@@ -143,13 +144,16 @@ class Module(metaclass=ModuleMeta):
 
 						raise
 
-					sys.modules[path] = fresh
+					sys.modules[key] = fresh
 					directory = cls.__lib__.Directory(
 						cls.__lib__,
 						os.path.dirname(path),
 						cls.__route__.rsplit('.', 1)[0]
 					)
-					directory.invalidate(os.path.basename(path))
+					directory.invalidate(
+						os.path.basename(path),
+						local = cls.__lib__.__dict__.get('__fork_source__') is not None
+					)
 					result = new
 				else:
 					raise TypeError(f'Incompatible replacement class: {cls.__route__}')

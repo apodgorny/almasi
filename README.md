@@ -124,6 +124,36 @@ other_lib.bar
 
 Each library maintains its own structure and namespace while participating in the same runtime model.
 
+### Forked runtime namespaces
+
+Named forks isolate Almasi's lazy Python module globals, runtime classes, service
+singletons, and namespace caches without publishing another canonical Python
+library. Forks may themselves be forked.
+
+```python
+import mylib
+
+alice = mylib.fork('alice')
+bob   = mylib.fork('bob')
+
+assert mylib['alice'] is alice
+assert mylib['default'] is mylib
+assert alice is not bob  # Each fork resolves its own Python components
+```
+
+Inside Python files loaded through a fork, `import mylib` (and imports of
+inherited library names) resolves to that fork. The ordinary application-level
+`import mylib` remains canonical, so use `mylib['alice']` to select the fork
+at the application boundary. Python code objects are reused between forks,
+but their classes and module globals are separate. The default library keeps
+its existing loader and cache behavior.
+
+The fork starts with fresh component caches and deep-copied ordinary public
+configuration values. Already resolved Python classes, bound methods, and
+service instances are not inherited. Library-specific lifecycle and external
+storage (for example an LMDB snapshot) belong to the consuming library's
+`fork()` override; Almasi does not clone persistent storage.
+
 ## Files and directories
 
 Almasi carriers expose identity through `get_path()`, `get_route()`, `get_lib()`, and `get_name()`. `is_directory()` is a method. Ordinary names such as `path`, `name`, `lib`, and `data` remain available to filesystem children.

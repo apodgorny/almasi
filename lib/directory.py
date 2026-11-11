@@ -12,7 +12,8 @@ import weakref
 
 from functools import partial
 
-from .file import File
+from .file    import File
+from .imports import Imports
 
 
 class Directory(File):
@@ -72,8 +73,10 @@ class Directory(File):
 
 					if is_dir:
 						# Keep plugin priority separate from the layer supplying this file.
-						library = instance if route == '.' else self.get_lib()
-						value   = library.__resolve__(name, parent_path, self.get_route(), source_lib=instance)
+						is_fork    = self.get_lib().__dict__.get('__fork_source__') is not None
+						library    = self.get_lib() if is_fork or route != '.' else instance
+						source_lib = self.get_lib() if is_fork else instance
+						value      = library.__resolve__(name, parent_path, self.get_route(), source_lib=source_lib)
 
 						if value is not None:
 							self.__children__[name] = value
@@ -125,7 +128,7 @@ class Directory(File):
 	# Invalidate a changed file in every live inherited namespace face.
 	# This work runs only on mutation, never on a cached attribute lookup.
 	# ----------------------------------------------------------------------
-	def _invalidate_children(self, path):
+	def _invalidate_children(self, path, local=False):
 		path          = os.path.abspath(path)
 		parent_path   = os.path.dirname(path)
 		source_lib    = self.get_lib()
@@ -134,6 +137,9 @@ class Directory(File):
 		relative      = os.path.relpath(parent_path, source_root) if is_under_root else None
 		route         = relative.replace(os.sep, '.') if relative is not None else None
 		stem          = os.path.splitext(os.path.basename(path))[0]
+
+		if path.endswith('.py'):
+			Imports.invalidate_code(path)
 
 		for face in tuple(Directory.__namespace_faces__):
 			if isinstance(face, Directory):
@@ -147,7 +153,9 @@ class Directory(File):
 			else:
 				is_affected = route == '.' and isinstance(face, type(source_lib))
 
-			if is_affected:
+			is_local = face is source_lib or (isinstance(face, Directory) and face.get_lib() is source_lib)
+
+			if is_affected and (not local or is_local):
 				for name, child in list(face.__children__.items()):
 					is_same_file = child.get_path() == path
 					is_same_name = name == stem or source_lib.String.camel_to_snake(name) == stem
@@ -260,9 +268,9 @@ class Directory(File):
 
 	# Explicitly refresh cached names after an external filesystem change.
 	# ----------------------------------------------------------------------
-	def invalidate(self, name):
+	def invalidate(self, name, local=False):
 		path = self._destination(name)
-		self._invalidate_children(path)
+		self._invalidate_children(path, local=local)
 
 	# Read one exact filename through its registered format plugin.
 	# ----------------------------------------------------------------------

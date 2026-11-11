@@ -4,6 +4,8 @@
 # Build canonical libraries with inherited filesystem namespaces.
 # ==============================================================================
 
+import builtins
+import copy
 import keyword
 import os, sys
 
@@ -55,6 +57,7 @@ class AMeta(type):
 		instance.__spec__         = None
 		instance.__children__     = {}
 		instance.__cached_names__ = set()
+		instance.__forks__       = {}
 
 		# Track live library namespaces for targeted cache invalidation.
 		Directory.__namespace_faces__.add(instance)
@@ -118,13 +121,14 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 		value = None
 
 		for instance in self.__instances__():
-			value = instance.__children__.get(name)
+			owner = self if self.__dict__.get('__fork_source__') is not None else instance
+			value = owner.__children__.get(name)
 			if value is not None:
 				break
 
-			value = instance.__resolve__(name, instance.__path__, self.__name__, source_lib=instance)
+			value = owner.__resolve__(name, instance.__path__, self.__name__, source_lib=owner)
 			if value is not None:
-				instance.__children__[name] = value
+				owner.__children__[name] = value
 				break
 
 		if value is None:
@@ -133,6 +137,12 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 		result = value.load()
 		self.__dict__[name] = result
 		self.__cached_names__.add(name)
+		return result
+
+	# Resolve a named fork without changing the canonical Python import.
+	# ----------------------------------------------------------------------
+	def __getitem__(self, name):
+		result = self if name == 'default' else self.__forks__[name]
 		return result
 
 	# String representation
@@ -150,7 +160,8 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 	def __instances__(self):
 		for cls in type(self).__mro__:
 			if cls != object:
-				yield cls.__instance__
+				instance = self if cls is type(self) and self.__dict__.get('__fork_source__') is not None else cls.__instance__
+				yield instance
 
 	# Resolve using the existing plugin order.
 	# source_lib owns the file; the selected plugin may belong to another library.
@@ -233,6 +244,71 @@ class A(metaclass=AMeta, plugins=['Py', 'Json', 'Text', 'Bytes']):
 			A.__app__ = library_class.__instance__
 
 		return library_class.__instance__
+
+	# Create a fresh runtime namespace without publishing a Python library.
+	# Source files and compiled code are shared; loaded classes and state are not.
+	# ----------------------------------------------------------------------
+	def fork(self, name):
+		if not isinstance(name, str) or not name or name == 'default':
+			raise ValueError(f'Invalid fork name: {name}')
+
+		if name in self.__forks__:
+			raise ValueError(f'Fork `{name}` already exists')
+
+		fork = object.__new__(type(self))
+
+		# Copy ordinary configuration without carrying resolved classes or services.
+		# ----------------------------------------------------------------------
+		for key, value in self.__dict__.items():
+			if not key.startswith('_') and key not in self.__cached_names__ and not callable(value):
+				fork.__dict__[key] = copy.deepcopy(value)
+
+		fork.__name__         = self.__name__
+		fork.__spec__         = None
+		fork.__fork_source__  = self
+		fork.__fork_name__    = name
+		fork.__forks__        = {}
+		fork.__children__     = {}
+		fork.__cached_names__ = set()
+		fork.__PLUGINS__      = {key: type(plugin)(fork) for key, plugin in type(self).__PLUGINS__.items()}
+
+		# Localize imports of this library and inherited libraries at load time.
+		# Other Python imports retain their ordinary process-wide meaning.
+		# ----------------------------------------------------------------------
+		fork.__fork_import_names__ = {
+			instance.__name__ for instance in fork.__instances__()
+			if instance.__name__ != 'a' or fork.__name__ == 'a'
+		}
+
+		def fork_import(module, globals=None, locals=None, fromlist=(), level=0):
+			result = None
+
+			if level == 0:
+				for library_name in fork.__fork_import_names__:
+					if module == library_name or module.startswith(library_name + '.'):
+						result = fork
+
+						if module != library_name:
+							for part in module[len(library_name) + 1:].split('.'):
+								result = getattr(result, part)
+
+							if not fromlist:
+								result = fork
+
+						break
+
+			if result is None:
+				result = builtins.__import__(module, globals, locals, fromlist, level)
+
+			return result
+
+		fork.__fork_builtins__ = builtins.__dict__.copy()
+		fork.__fork_builtins__['__import__'] = fork_import
+
+		Directory.__namespace_faces__.add(fork)
+		self.__forks__[name] = fork
+
+		return fork
 
 	# Join relative paths without mutating the library root.
 	# ----------------------------------------------------------------------
