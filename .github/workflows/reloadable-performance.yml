@@ -96,11 +96,12 @@ jobs:
               summary.append(f'| {operation} | {before:.3f} | {after:.3f} | {change:+.1f}% |')
 
           result = max(changes)
+          overview = ', '.join(f'{name}:{value:+.0f}%' for value, name in changes)
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
               stream.write('\n'.join(summary) + '\n')
 
           with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
-              stream.write(f'slowdown={result[0]:+.1f}% {result[1]}\n')
+              stream.write(f'slowdown={overview}\n')
 
           print('\n'.join(summary), flush=True)
           PY
