@@ -1,0 +1,113 @@
+name: Reloadable performance comparison
+
+on:
+  push:
+    branches: [reloadable-drain-benchmark]
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    outputs:
+      slowdown: ${{ steps.measure.outputs.slowdown }}
+
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          path: after
+
+      - name: Checkout baseline
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          path: before
+
+      - name: Checkout O
+        uses: actions/checkout@v4
+        with:
+          repository: apodgorny/almasi.o
+          ref: master
+          path: ontology
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ontology dependencies
+        run: python -m pip install -e ./after -e ./ontology jsonschema
+
+      - name: Compare identical O workloads
+        id: measure
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import statistics
+          import subprocess
+          import sys
+
+          workspace = os.getcwd()
+          measurements = {'before': [], 'after': []}
+
+          for round_index in range(3):
+              order = ('before', 'after') if round_index % 2 == 0 else ('after', 'before')
+
+              for revision in order:
+                  env = dict(os.environ)
+                  env['PYTHONPATH'] = os.pathsep.join([
+                      os.path.join(workspace, revision),
+                      os.path.join(workspace, 'ontology'),
+                  ])
+                  command = [
+                      sys.executable,
+                      os.path.join(workspace, 'ontology/root/tests/_test_performance.py'),
+                      '--size', '150',
+                      '--workload', 'expanded',
+                      '--_mode', 'graph',
+                      '--_json',
+                  ]
+                  completed = subprocess.run(
+                      command,
+                      cwd             = os.path.join(workspace, 'ontology'),
+                      env             = env,
+                      capture_output  = True,
+                      text            = True,
+                      check           = True,
+                      timeout         = 240,
+                  )
+                  measurements[revision].append(json.loads(completed.stdout))
+
+          operations = measurements['before'][0]
+          assert operations.keys() == measurements['after'][0].keys()
+
+          summary = [
+              '## Reloadable: O before/after',
+              'Same O master, Python 3.12, 3 alternating runs, size=150, graph.',
+              '| Operation | Before (us) | After (us) | Change |',
+              '|---|---:|---:|---:|'
+          ]
+          changes = []
+
+          for operation in operations:
+              before = statistics.median([row[operation] for row in measurements['before']])
+              after  = statistics.median([row[operation] for row in measurements['after']])
+              change = 100 * (after / before - 1)
+              changes.append((change, operation))
+              summary.append(f'| {operation} | {before:.3f} | {after:.3f} | {change:+.1f}% |')
+
+          result = max(changes)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
+              stream.write('\n'.join(summary) + '\n')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write(f'slowdown={result[0]:+.1f}% {result[1]}\n')
+
+          print('\n'.join(summary), flush=True)
+          PY
+
+  report:
+    needs: compare
+    name: "Worst O delta: ${{ needs.compare.outputs.slowdown }}"
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Performance comparison completed."
