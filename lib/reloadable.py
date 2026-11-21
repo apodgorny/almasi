@@ -4,11 +4,17 @@
 # Observe source changes and notify consumers of live instances.
 # ==============================================================================
 
+import asyncio
 import gc
+import inspect
 import logging
 import os
 import sys
+import threading
 import types
+
+from functools import wraps
+from time import monotonic
 
 from .module    import Module, ModuleMeta
 from .singleton import Singleton
@@ -34,64 +40,105 @@ class Reloadable:
 	# PRIVATE METHODS
 	# ==========================================================================
 
-	# Replace source-backed behavior while keeping live object identity and state.
-	# Invoke at a quiescent execution boundary; in-flight methods are not tracked.
+	# Wrap methods at class creation, never at attribute lookup.
+	# ----------------------------------------------------------------------
+	def __init_subclass__(cls, **kwargs):
+		super().__init_subclass__(**kwargs)
+
+		methods = tuple(
+			(name, member) for name, member in cls.__dict__.items()
+			if (inspect.isfunction(member) or isinstance(member, (classmethod, staticmethod)))
+			and name not in ('__new__', '__init_subclass__', '__getattribute__', '__reload__', '__del__')
+		)
+
+		if methods or cls.__dict__.get('__has_own_module__', False):
+			type.__setattr__(cls, '_reload_gate', {
+				'condition'   : threading.Condition(),
+				'reload_lock' : threading.Lock(),
+				'owners'      : {},
+				'paused'      : False,
+				'maintainer'  : None,
+				'waiters'     : [],
+			})
+
+		for name, member in methods:
+			method = member.__func__ if isinstance(member, (classmethod, staticmethod)) else member
+			wrapped = Reloadable._wrap_async(cls, method) if inspect.iscoroutinefunction(method) else Reloadable._wrap_sync(cls, method)
+
+			if isinstance(member, classmethod):
+				wrapped = classmethod(wrapped)
+			elif isinstance(member, staticmethod):
+				wrapped = staticmethod(wrapped)
+
+			# O TMeta treats public setattr as an ontology-field mutation.
+			# --------------------------------------------------------------
+			type.__setattr__(cls, name, wrapped)
+
+	# Replace source-backed behavior only after active methods finish.
 	# ----------------------------------------------------------------------
 	@classmethod
-	def __reload__(cls, commit=None):
+	def __reload__(cls, commit=None, timeout=30.0):
 		if cls.__dict__.get('__has_own_module__', False) and isinstance(cls, ModuleMeta):
-			key    = cls.__dict__.get('__original_module__', cls.__module__)
-			module = sys.modules.get(key)
-			path   = os.path.realpath(module.__file__) if module is not None else os.path.realpath(key)
+			gate = cls._reload_gate
 
-			if module is not None and module.__dict__.get(cls.__name__) is cls:
-				fresh = cls.__lib__.Imports.prepare_module(cls.__lib__, path, cls.__route__)
-				new   = fresh.__dict__.get(cls.__name__)
+			with gate['reload_lock']:
+				key    = cls.__dict__.get('__original_module__', cls.__module__)
+				module = sys.modules.get(key)
+				path   = os.path.realpath(module.__file__) if module is not None else os.path.realpath(key)
 
-				if isinstance(new, ModuleMeta) and new.__bases__ == cls.__bases__:
-					instances   = [item for item in gc.get_objects() if type(item) is cls]
-					descendants = [child for child in type.__subclasses__(cls) if isinstance(child, ModuleMeta)]
-					switched    = []
-					rebased     = []
+				if module is not None and module.__dict__.get(cls.__name__) is cls:
+					fresh = cls.__lib__.Imports.prepare_module(cls.__lib__, path, cls.__route__)
+					new   = fresh.__dict__.get(cls.__name__)
 
-					try:
-						for instance in instances:
-							object.__setattr__(instance, '__class__', new)
-							switched.append(instance)
+					if isinstance(new, ModuleMeta) and new.__bases__ == cls.__bases__:
+						Reloadable._pause(gate, timeout)
 
-						# Existing children retain their class identity and super() chain.
-						# --------------------------------------------------------------
-						for child in descendants:
-							bases = child.__bases__
-							type.__setattr__(child, '__bases__', tuple(new if base is cls else base for base in bases))
-							rebased.append((child, bases))
+						try:
+							instances   = [item for item in gc.get_objects() if type(item) is cls]
+							descendants = [child for child in type.__subclasses__(cls) if isinstance(child, ModuleMeta)]
+							switched    = []
+							rebased     = []
 
-						if commit is not None:
-							commit(cls, new)
-					except Exception:
-						for child, bases in reversed(rebased):
-							type.__setattr__(child, '__bases__', bases)
+							type.__setattr__(new, '_reload_gate', gate)
 
-						for instance in switched:
-							object.__setattr__(instance, '__class__', cls)
+							try:
+								for instance in instances:
+									object.__setattr__(instance, '__class__', new)
+									switched.append(instance)
 
-						raise
+								for child in descendants:
+									bases = child.__bases__
+									type.__setattr__(child, '__bases__', tuple(new if base is cls else base for base in bases))
+									rebased.append((child, bases))
 
-					sys.modules[key] = fresh
-					directory = cls.__lib__.Directory(
-						cls.__lib__,
-						os.path.dirname(path),
-						cls.__route__.rsplit('.', 1)[0]
-					)
-					directory.invalidate(
-						os.path.basename(path),
-						local = cls.__lib__.__dict__.get('__fork_source__') is not None
-					)
-					result = new
+								if commit is not None:
+									commit(cls, new)
+							except Exception:
+								for child, bases in reversed(rebased):
+									type.__setattr__(child, '__bases__', bases)
+
+								for instance in switched:
+									object.__setattr__(instance, '__class__', cls)
+
+								raise
+
+							sys.modules[key] = fresh
+							directory = cls.__lib__.Directory(
+								cls.__lib__,
+								os.path.dirname(path),
+								cls.__route__.rsplit('.', 1)[0]
+							)
+							directory.invalidate(
+								os.path.basename(path),
+								local = cls.__lib__.__dict__.get('__fork_source__') is not None
+							)
+							result = new
+						finally:
+							Reloadable._resume(gate)
+					else:
+						raise TypeError(f'Incompatible replacement class: {cls.__route__}')
 				else:
-					raise TypeError(f'Incompatible replacement class: {cls.__route__}')
-			else:
-				raise RuntimeError(f'Source module is not current: {cls.__route__}')
+					raise RuntimeError(f'Source module is not current: {cls.__route__}')
 		else:
 			raise TypeError(f'Hot reload requires a source-backed a.Module: {cls.__name__}')
 
@@ -131,6 +178,175 @@ class Reloadable:
 			subscription = file.subscribe(changed)
 			cls._reload_subscription = subscription
 
+	# Separate asynchronous owners from threads on the same event loop.
+	# ----------------------------------------------------------------------
+	@staticmethod
+	def _owner():
+		try:
+			task = asyncio.current_task()
+		except RuntimeError:
+			task = None
+
+		owner = task if task is not None else threading.get_ident()
+		return owner
+
+	# Keep new synchronous calls outside a paused implementation.
+	# ----------------------------------------------------------------------
+	@staticmethod
+	def _enter_sync(gate, owner):
+		with gate['condition']:
+			depth = gate['owners'].get(owner, 0)
+
+			if not depth and gate['paused'] and gate['maintainer'] != threading.get_ident():
+				try:
+					loop = asyncio.get_running_loop()
+				except RuntimeError:
+					loop = None
+
+				if loop is not None:
+					raise RuntimeError('Synchronous calls cannot wait for reload on an event-loop thread')
+
+				while gate['paused']:
+					gate['condition'].wait()
+
+			gate['owners'][owner] = depth + 1
+
+	# Suspend new async calls without blocking the event loop.
+	# ----------------------------------------------------------------------
+	@staticmethod
+	async def _enter_async(gate, owner):
+		entered = False
+		loop    = asyncio.get_running_loop()
+
+		while not entered:
+			waiter = None
+
+			with gate['condition']:
+				depth = gate['owners'].get(owner, 0)
+
+				if depth or not gate['paused']:
+					gate['owners'][owner] = depth + 1
+					entered = True
+				else:
+					waiter = loop.create_future()
+					gate['waiters'].append((loop, waiter))
+
+			if waiter is not None:
+				try:
+					await waiter
+				finally:
+					with gate['condition']:
+						if (loop, waiter) in gate['waiters']:
+							gate['waiters'].remove((loop, waiter))
+
+	# Release nested calls without releasing their active outer call.
+	# ----------------------------------------------------------------------
+	@staticmethod
+	def _leave(gate, owner):
+		with gate['condition']:
+			depth = gate['owners'][owner] - 1
+
+			if depth:
+				gate['owners'][owner] = depth
+			else:
+				del gate['owners'][owner]
+				gate['condition'].notify_all()
+
+	# Preserve bound-method identity while accounting for active sync calls.
+	# ----------------------------------------------------------------------
+	@staticmethod
+	def _wrap_sync(cls, method):
+		@wraps(method)
+		def invoke(*args, **kwargs):
+			gate  = cls._reload_gate
+			owner = Reloadable._owner()
+			Reloadable._enter_sync(gate, owner)
+
+			try:
+				result = method(*args, **kwargs)
+			finally:
+				Reloadable._leave(gate, owner)
+
+			return result
+
+		return invoke
+
+	# Include await suspension in the lifetime of async calls.
+	# ----------------------------------------------------------------------
+	@staticmethod
+	def _wrap_async(cls, method):
+		@wraps(method)
+		async def invoke(*args, **kwargs):
+			gate  = cls._reload_gate
+			owner = Reloadable._owner()
+			await Reloadable._enter_async(gate, owner)
+
+			try:
+				result = await method(*args, **kwargs)
+			finally:
+				Reloadable._leave(gate, owner)
+
+			return result
+
+		return invoke
+
+	# Close admission before waiting for all old-version calls to finish.
+	# ----------------------------------------------------------------------
+	@staticmethod
+	def _pause(gate, timeout):
+		deadline = monotonic() + timeout
+		owner    = Reloadable._owner()
+
+		try:
+			with gate['condition']:
+				if owner in gate['owners']:
+					raise RuntimeError('Cannot reload within an active method of the same class')
+
+				if gate['owners']:
+					try:
+						loop = asyncio.get_running_loop()
+					except RuntimeError:
+						loop = None
+
+					if loop is not None:
+						raise RuntimeError('Reload must drain from outside the running event loop')
+
+				gate['paused']     = True
+				gate['maintainer'] = threading.get_ident()
+
+				while gate['owners']:
+					remaining = deadline - monotonic()
+
+					if remaining <= 0:
+						raise TimeoutError('Reload timed out waiting for active methods')
+
+					gate['condition'].wait(remaining)
+		except BaseException:
+			Reloadable._resume(gate)
+			raise
+
+	# Wake a future only if cancellation did not complete it first.
+	# ----------------------------------------------------------------------
+	@staticmethod
+	def _wake(waiter):
+		if not waiter.done():
+			waiter.set_result(None)
+
+	# Symmetrically reopen admission for waiting threads and tasks.
+	# ----------------------------------------------------------------------
+	@staticmethod
+	def _resume(gate):
+		with gate['condition']:
+			gate['paused']     = False
+			gate['maintainer'] = None
+			waiters            = tuple(gate['waiters'])
+			gate['waiters'].clear()
+			gate['condition'].notify_all()
+
+		for loop, waiter in waiters:
+			if not loop.is_closed():
+				loop.call_soon_threadsafe(Reloadable._wake, waiter)
+
 	# Report an instance to its nearest inherited callback.
 	# ----------------------------------------------------------------------
 	@classmethod
@@ -163,8 +379,8 @@ class ReloadableModule(Reloadable, Module, metaclass=ReloadableMeta):
 class ReloadableSingleton(Reloadable, Singleton, metaclass=ReloadableMeta):
 	# Keep the initialized singleton and its instance-owned initializer.
 	# ----------------------------------------------------------------------
-	def __reload__(self):
-		fresh = super().__reload__()
+	def __reload__(self, timeout=30.0):
+		fresh = super().__reload__(timeout=timeout)
 
 		fresh.__instance__ = self
 		self.__dict__['_initialize'] = getattr(fresh, 'initialize', None)
