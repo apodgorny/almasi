@@ -190,26 +190,50 @@ class Reloadable:
 		owner = task if task is not None else threading.get_ident()
 		return owner
 
-	# Keep new synchronous calls outside a paused implementation.
+	# Admit ordinary sync calls without locking the common execution path.
 	# ----------------------------------------------------------------------
 	@staticmethod
-	def _enter_sync(gate, owner):
+	def _enter_sync(gate):
+		owner  = threading.get_ident()
+		owners = gate['owners']
+		depth  = owners.get(owner, 0)
+
+		if not gate['paused'] or depth or gate['maintainer'] == owner:
+			owners[owner] = depth + 1
+
+			if gate['paused'] and not depth and gate['maintainer'] != owner:
+				owners.pop(owner)
+				with gate['condition']:
+					gate['condition'].notify_all()
+				owner = Reloadable._wait_sync(gate, owner)
+		else:
+			owner = Reloadable._wait_sync(gate, owner)
+
+		return owner
+
+	# Coordinate sync callers only while admission is paused.
+	# ----------------------------------------------------------------------
+	@staticmethod
+	def _wait_sync(gate, owner):
+		try:
+			task = asyncio.current_task()
+		except RuntimeError:
+			task = None
+
 		with gate['condition']:
-			depth = gate['owners'].get(owner, 0)
+			if task is not None and task in gate['owners']:
+				owner = task
 
-			if not depth and gate['paused'] and gate['maintainer'] != threading.get_ident():
-				try:
-					loop = asyncio.get_running_loop()
-				except RuntimeError:
-					loop = None
-
-				if loop is not None:
+			if owner not in gate['owners'] and gate['maintainer'] != threading.get_ident():
+				if task is not None:
 					raise RuntimeError('Synchronous calls cannot wait for reload on an event-loop thread')
 
 				while gate['paused']:
 					gate['condition'].wait()
 
-			gate['owners'][owner] = depth + 1
+			gate['owners'][owner] = gate['owners'].get(owner, 0) + 1
+
+		return owner
 
 	# Suspend new async calls without blocking the event loop.
 	# ----------------------------------------------------------------------
@@ -239,17 +263,20 @@ class Reloadable:
 						if (loop, waiter) in gate['waiters']:
 							gate['waiters'].remove((loop, waiter))
 
-	# Release nested calls without releasing their active outer call.
+	# Release nested calls, waking a reloader only when necessary.
 	# ----------------------------------------------------------------------
 	@staticmethod
 	def _leave(gate, owner):
-		with gate['condition']:
-			depth = gate['owners'][owner] - 1
+		owners = gate['owners']
+		depth  = owners[owner] - 1
 
-			if depth:
-				gate['owners'][owner] = depth
-			else:
-				del gate['owners'][owner]
+		if depth:
+			owners[owner] = depth
+		else:
+			del owners[owner]
+
+		if gate['paused']:
+			with gate['condition']:
 				gate['condition'].notify_all()
 
 	# Preserve bound-method identity while accounting for active sync calls.
@@ -259,8 +286,7 @@ class Reloadable:
 		@wraps(method)
 		def invoke(*args, **kwargs):
 			gate  = cls._reload_gate
-			owner = Reloadable._owner()
-			Reloadable._enter_sync(gate, owner)
+			owner = Reloadable._enter_sync(gate)
 
 			try:
 				result = method(*args, **kwargs)
