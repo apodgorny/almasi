@@ -48,7 +48,12 @@ class Reloadable:
 		methods = tuple(
 			(name, member) for name, member in cls.__dict__.items()
 			if (inspect.isfunction(member) or isinstance(member, (classmethod, staticmethod)))
-			and name not in ('__new__', '__init_subclass__', '__getattribute__', '__reload__', '__del__')
+			and (not name.startswith('_') or name in (
+				'__getitem__', '__setitem__', '__getattr__', '__setattr__',
+				'__iter__', '__len__', '__contains__', '__call__', '__init__',
+				'__enter__', '__exit__', '__aenter__', '__aexit__',
+				'__bool__', '__eq__', '__hash__',
+			))
 		)
 
 		if methods or cls.__dict__.get('__has_own_module__', False):
