@@ -195,27 +195,6 @@ class Reloadable:
 		owner = task if task is not None else threading.get_ident()
 		return owner
 
-	# Admit ordinary sync calls without locking the common execution path.
-	# ----------------------------------------------------------------------
-	@staticmethod
-	def _enter_sync(gate):
-		owner  = threading.get_ident()
-		owners = gate['owners']
-		depth  = owners.get(owner, 0)
-
-		if not gate['paused'] or depth or gate['maintainer'] == owner:
-			owners[owner] = depth + 1
-
-			if gate['paused'] and not depth and gate['maintainer'] != owner:
-				owners.pop(owner)
-				with gate['condition']:
-					gate['condition'].notify_all()
-				owner = Reloadable._wait_sync(gate, owner)
-		else:
-			owner = Reloadable._wait_sync(gate, owner)
-
-		return owner
-
 	# Coordinate sync callers only while admission is paused.
 	# ----------------------------------------------------------------------
 	@staticmethod
@@ -284,19 +263,40 @@ class Reloadable:
 			with gate['condition']:
 				gate['condition'].notify_all()
 
-	# Preserve bound-method identity while accounting for active sync calls.
+	# Track active sync calls inline, avoiding two dispatch calls per read.
 	# ----------------------------------------------------------------------
 	@staticmethod
 	def _wrap_sync(cls, method):
 		@wraps(method)
 		def invoke(*args, **kwargs):
-			gate  = cls._reload_gate
-			owner = Reloadable._enter_sync(gate)
+			gate   = cls._reload_gate
+			owners = gate['owners']
+			owner  = threading.get_ident()
+			depth  = owners.get(owner, 0)
+
+			owners[owner] = depth + 1
+
+			if gate['paused'] and not depth and gate['maintainer'] != owner:
+				del owners[owner]
+
+				with gate['condition']:
+					gate['condition'].notify_all()
+
+				owner = Reloadable._wait_sync(gate, owner)
 
 			try:
 				result = method(*args, **kwargs)
 			finally:
-				Reloadable._leave(gate, owner)
+				depth = owners[owner] - 1
+
+				if depth:
+					owners[owner] = depth
+				else:
+					del owners[owner]
+
+				if gate['paused']:
+					with gate['condition']:
+						gate['condition'].notify_all()
 
 			return result
 
