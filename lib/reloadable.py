@@ -60,7 +60,7 @@ class Reloadable:
 			type.__setattr__(cls, '_reload_gate', {
 				'condition'   : threading.Condition(),
 				'reload_lock' : threading.Lock(),
-				'owners'      : {},
+				'owners'      : set(),
 				'paused'      : False,
 				'maintainer'  : None,
 				'waiters'     : [],
@@ -195,7 +195,7 @@ class Reloadable:
 		owner = task if task is not None else threading.get_ident()
 		return owner
 
-	# Coordinate sync callers only while admission is paused.
+	# Enter after a pause, allowing nested calls from an already active task.
 	# ----------------------------------------------------------------------
 	@staticmethod
 	def _wait_sync(gate, owner):
@@ -206,64 +206,61 @@ class Reloadable:
 
 		with gate['condition']:
 			if task is not None and task in gate['owners']:
-				owner = task
+				owner  = task
+				nested = True
+			else:
+				nested = False
 
-			if owner not in gate['owners'] and gate['maintainer'] != threading.get_ident():
-				if task is not None:
-					raise RuntimeError('Synchronous calls cannot wait for reload on an event-loop thread')
+				if gate['maintainer'] != threading.get_ident():
+					if task is not None:
+						raise RuntimeError('Synchronous calls cannot wait for reload on an event-loop thread')
 
-				while gate['paused']:
-					gate['condition'].wait()
+					while gate['paused']:
+						gate['condition'].wait()
 
-			gate['owners'][owner] = gate['owners'].get(owner, 0) + 1
+				gate['owners'].add(owner)
 
-		return owner
+		return owner, nested
 
-	# Suspend new async calls without blocking the event loop.
+	# Suspend asynchronous calls only when the caller does not already own entry.
 	# ----------------------------------------------------------------------
 	@staticmethod
 	async def _enter_async(gate, owner):
-		entered = False
-		loop    = asyncio.get_running_loop()
+		loop = asyncio.get_running_loop()
 
-		while not entered:
+		while True:
 			waiter = None
 
 			with gate['condition']:
-				depth = gate['owners'].get(owner, 0)
+				nested = owner in gate['owners']
 
-				if depth or not gate['paused']:
-					gate['owners'][owner] = depth + 1
-					entered = True
-				else:
-					waiter = loop.create_future()
-					gate['waiters'].append((loop, waiter))
+				if nested or not gate['paused']:
+					if not nested:
+						gate['owners'].add(owner)
+					return nested
 
-			if waiter is not None:
-				try:
-					await waiter
-				finally:
-					with gate['condition']:
-						if (loop, waiter) in gate['waiters']:
-							gate['waiters'].remove((loop, waiter))
+				waiter = loop.create_future()
+				gate['waiters'].append((loop, waiter))
 
-	# Release nested calls, waking a reloader only when necessary.
+			try:
+				await waiter
+			finally:
+				with gate['condition']:
+					if (loop, waiter) in gate['waiters']:
+						gate['waiters'].remove((loop, waiter))
+
+	# Release only the outermost call so nested methods stay admitted.
 	# ----------------------------------------------------------------------
 	@staticmethod
-	def _leave(gate, owner):
-		owners = gate['owners']
-		depth  = owners[owner] - 1
+	def _leave(gate, owner, nested):
+		if not nested:
+			gate['owners'].remove(owner)
 
-		if depth:
-			owners[owner] = depth
-		else:
-			del owners[owner]
+			if gate['paused']:
+				with gate['condition']:
+					gate['condition'].notify_all()
 
-		if gate['paused']:
-			with gate['condition']:
-				gate['condition'].notify_all()
-
-	# Track active sync calls inline, avoiding two dispatch calls per read.
+	# Use one owner-set lookup instead of per-call recursion counters.
 	# ----------------------------------------------------------------------
 	@staticmethod
 	def _wrap_sync(cls, method):
@@ -272,31 +269,28 @@ class Reloadable:
 			gate   = cls._reload_gate
 			owners = gate['owners']
 			owner  = threading.get_ident()
-			depth  = owners.get(owner, 0)
+			nested = owner in owners
 
-			owners[owner] = depth + 1
+			if not nested:
+				owners.add(owner)
 
-			if gate['paused'] and not depth and gate['maintainer'] != owner:
-				del owners[owner]
+				if gate['paused'] and gate['maintainer'] != owner:
+					owners.remove(owner)
 
-				with gate['condition']:
-					gate['condition'].notify_all()
+					with gate['condition']:
+						gate['condition'].notify_all()
 
-				owner = Reloadable._wait_sync(gate, owner)
+					owner, nested = Reloadable._wait_sync(gate, owner)
 
 			try:
 				result = method(*args, **kwargs)
 			finally:
-				depth = owners[owner] - 1
+				if not nested:
+					owners.remove(owner)
 
-				if depth:
-					owners[owner] = depth
-				else:
-					del owners[owner]
-
-				if gate['paused']:
-					with gate['condition']:
-						gate['condition'].notify_all()
+					if gate['paused']:
+						with gate['condition']:
+							gate['condition'].notify_all()
 
 			return result
 
@@ -310,12 +304,12 @@ class Reloadable:
 		async def invoke(*args, **kwargs):
 			gate  = cls._reload_gate
 			owner = Reloadable._owner()
-			await Reloadable._enter_async(gate, owner)
+			nested = await Reloadable._enter_async(gate, owner)
 
 			try:
 				result = await method(*args, **kwargs)
 			finally:
-				Reloadable._leave(gate, owner)
+				Reloadable._leave(gate, owner, nested)
 
 			return result
 
