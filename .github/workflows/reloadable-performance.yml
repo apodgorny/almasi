@@ -8,7 +8,14 @@ jobs:
   compare:
     runs-on: ubuntu-latest
     outputs:
-      slowdown: ${{ steps.measure.outputs.slowdown }}
+      list_getitem: ${{ steps.measure.outputs.list_getitem }}
+      list_setitem: ${{ steps.measure.outputs.list_setitem }}
+      dict_getitem: ${{ steps.measure.outputs.dict_getitem }}
+      dict_setitem: ${{ steps.measure.outputs.dict_setitem }}
+      object_attr_get: ${{ steps.measure.outputs.object_attr_get }}
+      object_attr_set: ${{ steps.measure.outputs.object_attr_set }}
+      object_create: ${{ steps.measure.outputs.object_create }}
+      define: ${{ steps.measure.outputs.define }}
 
     steps:
       - name: Checkout candidate
@@ -93,6 +100,8 @@ jobs:
               after  = statistics.median([row[operation] for row in measurements['after']])
               change = 100 * (after / before - 1)
               changes.append((change, operation))
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+                  stream.write(f'{operation}={before:.3f} to {after:.3f} us ({change:+.1f}%)\n')
               summary.append(f'| {operation} | {before:.3f} | {after:.3f} | {change:+.1f}% |')
 
           result = max(changes)
@@ -108,7 +117,18 @@ jobs:
 
   report:
     needs: compare
-    name: "Worst O delta: ${{ needs.compare.outputs.slowdown }}"
+    strategy:
+      matrix:
+        operation:
+          - list_getitem
+          - list_setitem
+          - dict_getitem
+          - dict_setitem
+          - object_attr_get
+          - object_attr_set
+          - object_create
+          - define
+    name: "${{ matrix.operation }}: ${{ needs.compare.outputs[matrix.operation] }}"
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Performance comparison completed."
+      - run: echo 'Comparison completed.'
